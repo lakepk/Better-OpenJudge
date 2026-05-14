@@ -1,0 +1,25 @@
+# Python 缓存
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 虚拟环境
+.venv/
+venv/
+ENV/
+
+# OpenJudge 本地数据库
+*.sqlite3
+*.db
+
+# 评测机沙箱产生的临时文件和编译产物
+*.out
+*.exe
+*.o
+/temp_judge/
+/test_data/  # 如果测试数据太大，建议也不要放进代码仓库
+
+# IDE 与系统配置
+.vscode/
+.idea/
+.DS_Store
