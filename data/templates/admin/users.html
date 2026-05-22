@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}用户管理 - LiteJudge{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>用户管理</h2>
+
+    {% if users %}
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>用户名</th>
+                <th>昵称</th>
+                <th>邮箱</th>
+                <th>角色</th>
+                <th>状态</th>
+                <th>注册时间</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in users %}
+            <tr>
+                <td>{{ u.id }}</td>
+                <td>{{ u.username }}</td>
+                <td>{{ u.nickname or '-' }}</td>
+                <td>{{ u.email or '-' }}</td>
+                <td>{{ '管理员' if u.role == 'admin' else '用户' }}</td>
+                <td>{{ '正常' if u.is_active else '禁用' }}</td>
+                <td class="text-muted">{{ u.created_at }}</td>
+                <td>
+                    <form method="post" action="/admin/toggle_user/{{ u.id }}" style="display:inline;">
+                        {% if u.is_active %}
+                            <button type="submit" class="btn btn-danger btn-sm">禁用</button>
+                        {% else %}
+                            <button type="submit" class="btn btn-primary btn-sm">启用</button>
+                        {% endif %}
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted text-center" style="padding: 40px;">暂无用户</p>
+    {% endif %}
+</div>
+{% endblock %}

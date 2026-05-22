@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}编辑题目 - {{ problem.title }} - LiteJudge{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>编辑题目: {{ problem.title }}</h2>
+
+    <form method="post">
+        <div class="form-group">
+            <label>题目标题 *</label>
+            <input type="text" name="title" value="{{ problem.title }}" required>
+        </div>
+        <div class="form-group">
+            <label>题目描述</label>
+            <textarea name="description" rows="6">{{ problem.description }}</textarea>
+        </div>
+        <div class="form-group">
+            <label>输入格式</label>
+            <textarea name="input_format" rows="3">{{ problem.input_format }}</textarea>
+        </div>
+        <div class="form-group">
+            <label>输出格式</label>
+            <textarea name="output_format" rows="3">{{ problem.output_format }}</textarea>
+        </div>
+        <div class="form-group">
+            <label>样例输入</label>
+            <textarea name="sample_input" rows="4" style="font-family:monospace;">{{ problem.sample_input }}</textarea>
+        </div>
+        <div class="form-group">
+            <label>样例输出</label>
+            <textarea name="sample_output" rows="4" style="font-family:monospace;">{{ problem.sample_output }}</textarea>
+        </div>
+        <div class="form-group">
+            <label>提示</label>
+            <textarea name="hint" rows="3">{{ problem.hint }}</textarea>
+        </div>
+        <div class="form-group">
+            <label>来源</label>
+            <input type="text" name="source" value="{{ problem.source }}">
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+                <label>难度</label>
+                <select name="difficulty">
+                    <option value="1" {% if problem.difficulty == 1 %}selected{% endif %}>简单</option>
+                    <option value="2" {% if problem.difficulty == 2 %}selected{% endif %}>中等</option>
+                    <option value="3" {% if problem.difficulty == 3 %}selected{% endif %}>困难</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>时间限制 (ms)</label>
+                <input type="number" name="time_limit" value="{{ problem.time_limit }}">
+            </div>
+            <div class="form-group">
+                <label>内存限制 (KB)</label>
+                <input type="number" name="memory_limit" value="{{ problem.memory_limit }}">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>是否公开</label>
+            <select name="is_visible">
+                <option value="1" {% if problem.is_visible %}selected{% endif %}>公开</option>
+                <option value="0" {% if not problem.is_visible %}selected{% endif %}>隐藏</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>标签</label>
+            <input type="text" name="tags" value="{{ problem.tags | join(',') }}" placeholder="多个标签用逗号分隔">
+        </div>
+        <button type="submit" class="btn btn-primary">保存修改</button>
+        <a href="/problem/{{ problem.id }}" class="btn btn-secondary">取消</a>
+    </form>
+</div>
+{% endblock %}

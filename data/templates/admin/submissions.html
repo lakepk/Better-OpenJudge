@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}全部提交 - LiteJudge{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>全部提交记录</h2>
+
+    {% if submissions %}
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>用户</th>
+                <th>题目</th>
+                <th>状态</th>
+                <th>语言</th>
+                <th>时间</th>
+                <th>提交时间</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in submissions %}
+            <tr>
+                <td><a href="/submission/{{ s.id }}">{{ s.id }}</a></td>
+                <td>{{ s.username }}</td>
+                <td><a href="/problem/{{ s.problem_id }}">{{ s.problem_title }}</a></td>
+                <td><span class="status status-{{ s.status }}">{{ s.status }}</span></td>
+                <td>{{ s.language }}</td>
+                <td>{{ s.time_used }}ms</td>
+                <td class="text-muted">{{ s.created_at }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted text-center" style="padding: 40px;">暂无提交记录</p>
+    {% endif %}
+</div>
+{% endblock %}

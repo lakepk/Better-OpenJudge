@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}题目管理 - LiteJudge{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="flex-between mb-20">
+        <h2>题目管理</h2>
+        <a href="/admin/create_problem" class="btn btn-primary">创建题目</a>
+    </div>
+
+    {% if problems %}
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>标题</th>
+                <th>难度</th>
+                <th>可见</th>
+                <th>通过率</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in problems %}
+            <tr>
+                <td>{{ p.id }}</td>
+                <td><a href="/problem/{{ p.id }}">{{ p.title }}</a></td>
+                <td>{{ p.difficulty }}</td>
+                <td>{{ '是' if p.is_visible else '否' }}</td>
+                <td>
+                    {% if p.submission_count > 0 %}
+                        {{ ((p.accepted_count / p.submission_count) * 100) | round(1) }}%
+                    {% else %}0%{% endif %}
+                </td>
+                <td>
+                    <a href="/admin/edit_problem/{{ p.id }}" class="btn btn-secondary btn-sm">编辑</a>
+                    <a href="/admin/problem/{{ p.id }}/test_cases" class="btn btn-secondary btn-sm">测试数据</a>
+                    <form method="post" action="/admin/delete_problem/{{ p.id }}" style="display:inline;" onsubmit="confirmDelete(this); return false;">
+                        <button type="submit" class="btn btn-danger btn-sm">删除</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted text-center" style="padding: 40px;">暂无题目，点击上方按钮创建</p>
+    {% endif %}
+</div>
+{% endblock %}

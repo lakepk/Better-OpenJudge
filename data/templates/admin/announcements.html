@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}公告管理 - LiteJudge{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="flex-between mb-20">
+        <h2>公告管理</h2>
+        <a href="/admin/create_announcement" class="btn btn-primary">创建公告</a>
+    </div>
+
+    {% if announcements %}
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>标题</th>
+                <th>内容</th>
+                <th>置顶</th>
+                <th>发布时间</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for a in announcements %}
+            <tr>
+                <td>{{ a.id }}</td>
+                <td>{{ a.title }}</td>
+                <td style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ a.content }}</td>
+                <td>{{ '是' if a.is_pinned else '否' }}</td>
+                <td class="text-muted">{{ a.created_at }}</td>
+                <td>
+                    <form method="post" action="/admin/delete_announcement/{{ a.id }}" style="display:inline;" onsubmit="confirmDelete(this); return false;">
+                        <button type="submit" class="btn btn-danger btn-sm">删除</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted text-center" style="padding: 40px;">暂无公告</p>
+    {% endif %}
+</div>
+{% endblock %}
