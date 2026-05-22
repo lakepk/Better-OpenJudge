@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}添加测试点 - {{ problem.title }} - LiteJudge{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>添加测试点: {{ problem.title }}</h2>
+
+    <form method="post">
+        <div class="form-group">
+            <label>测试点序号</label>
+            <input type="number" name="case_order" value="1" min="1">
+        </div>
+        <div class="form-group">
+            <label>分值</label>
+            <input type="number" name="score" value="10" min="0">
+        </div>
+        <div class="form-group">
+            <label>标准输入 *</label>
+            <textarea name="input" rows="5" style="font-family:monospace;" required></textarea>
+        </div>
+        <div class="form-group">
+            <label>标准输出 *</label>
+            <textarea name="output" rows="5" style="font-family:monospace;" required></textarea>
+        </div>
+        <div class="form-group">
+            <label>是否隐藏</label>
+            <select name="is_hidden">
+                <option value="0">否（样例，用户可见）</option>
+                <option value="1">是（隐藏测试点）</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">添加</button>
+        <a href="/admin/problem/{{ problem.id }}/test_cases" class="btn btn-secondary">取消</a>
+    </form>
+</div>
+{% endblock %}
