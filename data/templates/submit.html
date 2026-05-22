@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}提交代码 - {{ problem.title }} - LiteJudge{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>提交代码: {{ problem.title }}</h2>
+
+    <p class="text-muted mb-20">
+        时间限制: {{ problem.time_limit }}ms | 
+        内存限制: {{ (problem.memory_limit / 1024) | round(1) }}MB
+    </p>
+
+    {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+    <form method="post">
+        <div class="form-group">
+            <label>编程语言</label>
+            <select name="language">
+                <option value="cpp">C++</option>
+                <option value="python">Python</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>代码</label>
+            <textarea name="code" class="code-editor" placeholder="在此粘贴你的代码..." required></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">提交评测</button>
+        <a href="/problem/{{ problem.id }}" class="btn btn-secondary">返回题目</a>
+    </form>
+</div>
+{% endblock %}

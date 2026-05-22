@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}题目列表 - LiteJudge{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>题目列表</h2>
+    {% if problems %}
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>标题</th>
+                <th>难度</th>
+                <th>时间限制</th>
+                <th>内存限制</th>
+                <th>通过率</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in problems %}
+            <tr>
+                <td>{{ p.id }}</td>
+                <td>
+                    <a href="/problem/{{ p.id }}">{{ p.title }}</a>
+                    {% if user.role == 'admin' and not p.is_visible %}
+                        <span class="text-muted">[隐藏]</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="difficulty 
+                        {% if p.difficulty == 1 %}difficulty-easy
+                        {% elif p.difficulty == 2 %}difficulty-medium
+                        {% else %}difficulty-hard{% endif %}">
+                        {{ '★' * p.difficulty }}{{ '☆' * (3 - p.difficulty) }}
+                    </span>
+                </td>
+                <td>{{ p.time_limit }}ms</td>
+                <td>{{ (p.memory_limit / 1024) | round(1) }}MB</td>
+                <td>
+                    {% if p.submission_count > 0 %}
+                        {{ ((p.accepted_count / p.submission_count) * 100) | round(1) }}%
+                    {% else %}0%{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted text-center" style="padding: 40px;">暂无题目</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}个人中心 - LiteJudge{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="flex-between mb-20">
+        <h2>个人中心</h2>
+        <a href="/profile/edit" class="btn btn-secondary btn-sm">编辑资料</a>
+    </div>
+
+    <table>
+        <tr><td width="100"><strong>用户名</strong></td><td>{{ profile_user.username }}</td></tr>
+        <tr><td><strong>昵称</strong></td><td>{{ profile_user.nickname or '-' }}</td></tr>
+        <tr><td><strong>邮箱</strong></td><td>{{ profile_user.email or '-' }}</td></tr>
+        <tr><td><strong>角色</strong></td><td>{{ '管理员' if profile_user.role == 'admin' else '普通用户' }}</td></tr>
+        <tr><td><strong>注册时间</strong></td><td>{{ profile_user.created_at }}</td></tr>
+        {% if profile_user.last_login %}
+        <tr><td><strong>最后登录</strong></td><td>{{ profile_user.last_login }}</td></tr>
+        {% endif %}
+    </table>
+</div>
+
+<div class="card">
+    <h2>最近提交</h2>
+    {% if submissions %}
+    <table>
+        <thead>
+            <tr>
+                <th>题目</th>
+                <th>状态</th>
+                <th>语言</th>
+                <th>时间</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in submissions %}
+            <tr>
+                <td><a href="/problem/{{ s.problem_id }}">{{ s.problem_title }}</a></td>
+                <td><span class="status status-{{ s.status }}">{{ s.status }}</span></td>
+                <td>{{ s.language }}</td>
+                <td class="text-muted">{{ s.created_at }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted text-center" style="padding: 30px;">暂无提交记录</p>
+    {% endif %}
+</div>
+{% endblock %}

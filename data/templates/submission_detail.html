@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}提交 #{{ submission.id }} - LiteJudge{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>提交详情 #{{ submission.id }}</h2>
+    <table class="mb-20">
+        <tr><td width="100"><strong>题目</strong></td><td><a href="/problem/{{ submission.problem_id }}">{{ submission.problem_title }}</a></td></tr>
+        <tr><td><strong>用户</strong></td><td>{{ submission.username }}</td></tr>
+        <tr><td><strong>状态</strong></td><td><span class="status status-{{ submission.status }}">{{ submission.status }}</span></td></tr>
+        <tr><td><strong>得分</strong></td><td>{{ submission.score }}</td></tr>
+        <tr><td><strong>语言</strong></td><td>{{ submission.language }}</td></tr>
+        <tr><td><strong>运行时间</strong></td><td>{{ submission.time_used }}ms</td></tr>
+        <tr><td><strong>运行内存</strong></td><td>{{ submission.memory_used }}KB ({{ (submission.memory_used / 1024) | round(2) }}MB)</td></tr>
+        <tr><td><strong>提交时间</strong></td><td>{{ submission.created_at }}</td></tr>
+    </table>
+</div>
+
+{% if submission.compiler_output %}
+<div class="card">
+    <h3>编译输出</h3>
+    <pre style="background:#1e1e1e; color:#f44747; padding:12px; border-radius:6px; overflow-x:auto; font-size:13px;">{{ submission.compiler_output }}</pre>
+</div>
+{% endif %}
+
+<div class="card">
+    <h3>源代码</h3>
+    <pre style="background:#1e1e1e; color:#d4d4d4; padding:16px; border-radius:6px; overflow-x:auto; font-size:13px; line-height:1.5;">{{ submission.code }}</pre>
+</div>
+{% endblock %}
