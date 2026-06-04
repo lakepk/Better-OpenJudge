@@ -19,4 +19,4 @@ EXPOSE 8080
 ENV PYTHONUNBUFFERED=1
 ENV DATABASE_PATH=/app/db/judge.db
 
-CMD ["gunicorn", "-b", "0.0.0.0:8080", "--access-logfile", "-", "web.run:app"]
+CMD ["gunicorn", "-w", "3", "-b", "0.0.0.0:8080", "--access-logfile", "-", "web.run:app"]

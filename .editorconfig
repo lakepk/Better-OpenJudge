@@ -1,0 +1,16 @@
+root = true
+
+# 匹配所有的文件
+[*]
+
+# 强制使用 utf-8 编码
+charset = utf-8
+
+# 换行符统一成lf
+end_of_line = lf
+
+# 文件末尾自动保留一个空行
+insert_final_newline = true
+
+# 自动删除行尾多余的空格
+trim_trailing_whitespace = true

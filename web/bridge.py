@@ -19,7 +19,7 @@ _DATA_DIR = os.path.join(_PROJECT_ROOT, 'data')
 if _DATA_DIR not in sys.path:
     sys.path.insert(0, _DATA_DIR)
 
-_JUDGE_DIR = os.path.join(_PROJECT_ROOT, 'judge', 'judge')
+_JUDGE_DIR = os.path.join(_PROJECT_ROOT, 'judge')
 if _JUDGE_DIR not in sys.path:
     sys.path.insert(0, _JUDGE_DIR)
 
