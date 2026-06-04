@@ -1,8 +1,8 @@
 import os
 
 BASE_DIR=os.path.dirname(os.path.abspath(__file__))
-DATA_DIR=os.path.join(BASE_DIR,"data")       #²âÊÔÊı¾İ´æ·ÅµØ
-RUN_DIR=os.path.join(BASE_DIR,"run_tmp")     #ÔËĞĞÓÃ»§´úÂëµÄÁÙÊ±É³ÏäÄ¿Â¼
+DATA_DIR=os.path.join(BASE_DIR,"data")       #æµ‹è¯•æ•°æ®å­˜æ”¾åœ°
+RUN_DIR=os.path.join(BASE_DIR,"run_tmp")     #è¿è¡Œç”¨æˆ·ä»£ç çš„ä¸´æ—¶æ²™ç®±ç›®å½•
 
 os.makedirs(RUN_DIR, exist_ok=True)
 

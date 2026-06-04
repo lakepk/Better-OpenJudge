@@ -2,13 +2,13 @@ class Checker:
     @staticmethod
     def check(user_out_path:str,ans_out_path:str)->bool:
         """
-        ±ê×¼ÎÄ±¾±È¶ÔÂß¼­£¨ÑÏ¸ñ±È¶Ô£¬ºöÂÔĞĞÄ©¿Õ¸ñºÍÎÄÄ©»»ĞĞ£©
+        æ ‡å‡†æ–‡æœ¬æ¯”å¯¹é€»è¾‘ï¼ˆä¸¥æ ¼æ¯”å¯¹ï¼Œå¿½ç•¥è¡Œæœ«ç©ºæ ¼å’Œæ–‡æœ«æ¢è¡Œï¼‰
         """
         try:
             with open(user_out_path,'r',encoding='utf-8') as f1,\
                  open(ans_out_path,'r',encoding='utf-8') as f2:
                 
-                # ¹ıÂËµô´¿¿ÕĞĞ£¬²¢È¥µôÃ¿ĞĞÄ©Î²µÄ¿Õ°××Ö·û
+                # è¿‡æ»¤æ‰çº¯ç©ºè¡Œï¼Œå¹¶å»æ‰æ¯è¡Œæœ«å°¾çš„ç©ºç™½å­—ç¬¦
                 user_lines=[line.rstrip() for line in f1.readlines() if line.strip()]
                 ans_lines=[line.rstrip() for line in f2.readlines() if line.strip()]
                 

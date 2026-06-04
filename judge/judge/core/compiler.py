@@ -5,8 +5,8 @@ class Compiler:
     @staticmethod
     def compile(lang:str,src_path:str,output_dir:str)->str:
         """
-        ±àÒëÓÃ»§´úÂë
-        ·µ»Ø£º±àÒëºóµÄ¿ÉÖ´ÐÐÎÄ¼þÂ·¾¶/Ö´ÐÐÃüÁîÂ·¾¶¡£Èç¹û²»ÐèÒª±àÒë£¨ÈçPython£©£¬Ö±½Ó·µ»ØÔ­Â·¾¶¡£
+        ç¼–è¯‘ç”¨æˆ·ä»£ç 
+        è¿”å›žï¼šç¼–è¯‘åŽçš„å¯æ‰§è¡Œæ–‡ä»¶è·¯å¾„/æ‰§è¡Œå‘½ä»¤è·¯å¾„ã€‚å¦‚æžœä¸éœ€è¦ç¼–è¯‘ï¼ˆå¦‚Pythonï¼‰ï¼Œç›´æŽ¥è¿”å›žåŽŸè·¯å¾„ã€‚
         Raises: CompileError
         """
         if lang.lower() in ["python","python3"]:

@@ -12,31 +12,31 @@ class JudgeController:
         self.problem_id=task_data["problem_id"]
         self.lang=task_data["language"]
         self.code=task_data["source_code"]
-        self.time_limit=task_data["time_limit"]     # ¼ÙÉè´«ÈëµÄÊÇÃë
-        self.memory_limit=task_data["memory_limit"] # ¼ÙÉè´«ÈëµÄÊÇMB
-        # ÁÙÊ±¹¤×÷Ä¿Â¼
+        self.time_limit=task_data["time_limit"]     # å‡è®¾ä¼ å…¥çš„æ˜¯ç§’
+        self.memory_limit=task_data["memory_limit"] # å‡è®¾ä¼ å…¥çš„æ˜¯MB
+        # ä¸´æ—¶å·¥ä½œç›®å½•
         self.workspace=os.path.join(RUN_DIR,f"sub_{self.task_id}")
         os.makedirs(self.workspace,exist_ok=True)
 
     def start(self, test_cases:list)->Dict[str,Any]:
         """
-        ¿ªÊ¼ÆÀ²âÖ÷Á÷³Ì
-        test_cases: ¸ñÊ½Èç [{"in": "1.in", "out": "1.out"}, ...]
+        å¼€å§‹è¯„æµ‹ä¸»æµç¨‹
+        test_cases: æ ¼å¼å¦‚ [{"in": "1.in", "out": "1.out"}, ...]
         """
-        # ½«´úÂëĞ´ÈëÁÙÊ±ÎÄ¼ş
+        # å°†ä»£ç å†™å…¥ä¸´æ—¶æ–‡ä»¶
         ext=".py" if "python" in self.lang.lower() else ".cpp"
         src_path=os.path.join(self.workspace,f"solution{ext}")
         with open(src_path,"w",encoding="utf-8") as f:
             f.write(self.code)
 
-        # ±àÒë
+        # ç¼–è¯‘
         try:
             exe_path=Compiler.compile(self.lang,src_path,self.workspace)
         except Exception as e:
             self._cleanup()
             return {"status":JudgeStatus.CE,"message":str(e),"cases":[]}
 
-        # Ñ­»·ÅÜ²âÊÔµã
+        # å¾ªç¯è·‘æµ‹è¯•ç‚¹
         runner=Runner(exe_path,self.lang)
         final_status=JudgeStatus.AC
         max_time=0
@@ -46,16 +46,16 @@ class JudgeController:
         for idx,case in enumerate(test_cases):
             user_out = os.path.join(self.workspace,f"user_{idx}.out")
             
-            # ÔËĞĞ¸Ã²âÊÔµã
+            # è¿è¡Œè¯¥æµ‹è¯•ç‚¹
             run_res=runner.run_single_case(case["in"],case["out"],self.time_limit,self.memory_limit)
             
-            # ¸üĞÂÊ±¿ÕÏûºÄ×î´óÖµ
+            # æ›´æ–°æ—¶ç©ºæ¶ˆè€—æœ€å¤§å€¼
             max_time=max(max_time,run_res["time"])
             max_memory=max(max_memory,run_res["memory"])
 
-            # ½á¹ûÅĞ¶¨
+            # ç»“æœåˆ¤å®š
             if run_res["status"]=="SUCCESS":
-                # ÔËĞĞ³É¹¦£¬±È¶ÔÊä³ö
+                # è¿è¡ŒæˆåŠŸï¼Œæ¯”å¯¹è¾“å‡º
                 is_correct=Checker.check(user_out,case["out"])
                 case_status=JudgeStatus.AC if is_correct else JudgeStatus.WA
             else:
@@ -70,7 +70,7 @@ class JudgeController:
 
             if case_status!=JudgeStatus.AC and final_status==JudgeStatus.AC:
                 final_status=case_status
-                break  # ¼ÇÂ¼µÚÒ»¸öÎ´Í¨¹ıµÄ×´Ì¬×÷ÎªÕûÌå×´Ì¬
+                break  # è®°å½•ç¬¬ä¸€ä¸ªæœªé€šè¿‡çš„çŠ¶æ€ä½œä¸ºæ•´ä½“çŠ¶æ€
 
         self._cleanup()
 
@@ -83,6 +83,6 @@ class JudgeController:
         }
 
     def _cleanup(self):
-        """ÇåÀíÁÙÊ±¹¤×÷¿Õ¼ä"""
+        """æ¸…ç†ä¸´æ—¶å·¥ä½œç©ºé—´"""
         if os.path.exists(self.workspace):
             shutil.rmtree(self.workspace)

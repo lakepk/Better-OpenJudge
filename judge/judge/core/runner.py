@@ -9,13 +9,13 @@ class Runner:
 
     def run_single_case(self,input_file:str,output_file:str,time_limit:float,memory_limit:int)->Dict[str,Any]:
         """
-        ÔËĞĞµ¥¸ö²âÊÔµã
-        - input_file: ±ê×¼ÊäÈëÎÄ¼şÂ·¾¶
-        - output_file: ÓÃ»§Êä³öĞ´ÈëµÄÁÙÊ±ÎÄ¼şÂ·¾¶
-        - time_limit: Ê±¼äÏŞÖÆ(Ãë)
-        - memory_limit: ÄÚ´æÏŞÖÆ(MB)
+        è¿è¡Œå•ä¸ªæµ‹è¯•ç‚¹
+        - input_file: æ ‡å‡†è¾“å…¥æ–‡ä»¶è·¯å¾„
+        - output_file: ç”¨æˆ·è¾“å‡ºå†™å…¥çš„ä¸´æ—¶æ–‡ä»¶è·¯å¾„
+        - time_limit: æ—¶é—´é™åˆ¶(ç§’)
+        - memory_limit: å†…å­˜é™åˆ¶(MB)
         """
-        # ¸ù¾İÓïÑÔ¹¹½¨Ö´ĞĞÃüÁî
+        # æ ¹æ®è¯­è¨€æ„å»ºæ‰§è¡Œå‘½ä»¤
         cmd=[]
         if self.lang.lower() in ["python","python3"]:
             cmd=["python",self.exe_path]
@@ -29,10 +29,10 @@ class Runner:
                     stdin=infile,
                     stdout=outfile,
                     stderr=subprocess.PIPE,
-                    timeout=time_limit, #»ù´¡ÏŞÊ±·ÀÖ¹ËÀÑ­»·
+                    timeout=time_limit, #åŸºç¡€é™æ—¶é˜²æ­¢æ­»å¾ªç¯
                     text=True
                 )
-            time_used=(time.time()-start_time)*1000 #×ªÎªºÁÃë
+            time_used=(time.time()-start_time)*1000 #è½¬ä¸ºæ¯«ç§’
             if res.returncode!=0:
                 return {"status":"RE","time":time_used,"memory":0,"message":res.stderr}
             return {"status":"SUCCESS","time":time_used,"memory":0}

@@ -2,7 +2,7 @@ from core.controller import JudgeController
 import os
 
 if __name__=="__main__":
-    # 1. Ä£Äâ Web ¶Ë·¢¹ıÀ´µÄÈÎÎñÊı¾İ
+    # 1. æ¨¡æ‹Ÿ Web ç«¯å‘è¿‡æ¥çš„ä»»åŠ¡æ•°æ®
     mock_task={
         "submission_id":9999,
         "problem_id":1001,
@@ -12,7 +12,7 @@ if __name__=="__main__":
         "memory_limit":128
     }
 
-    # ÏÈÈ·±£´´½¨ÁËÕâĞ©Ä£ÄâÊäÈëÊä³ö
+    # å…ˆç¡®ä¿åˆ›å»ºäº†è¿™äº›æ¨¡æ‹Ÿè¾“å…¥è¾“å‡º
     mock_in = "mock_1.in"
     mock_out = "mock_1.out"
     with open(mock_in, "w") as f: f.write("10\n5\n")
@@ -22,14 +22,14 @@ if __name__=="__main__":
         {"in": mock_in, "out": mock_out}
     ]
 
-    # 3. ÊµÀı¿ØÖÆÆ÷²¢ÅÜÆÀ²â
-    print("¿ªÊ¼±¾µØÆÀ²â¼Ü¹¹²âÊÔ...")
+    # 3. å®ä¾‹æ§åˆ¶å™¨å¹¶è·‘è¯„æµ‹
+    print("å¼€å§‹æœ¬åœ°è¯„æµ‹æ¶æ„æµ‹è¯•...")
     controller = JudgeController(mock_task)
     result = controller.start(test_cases)
     
-    print("\nÆÀ²â·µ»Ø½á¹û JSON:")
+    print("\nè¯„æµ‹è¿”å›ç»“æœ JSON:")
     print(result)
 
-    # ÇåÀíÍâ²¿Ä£ÄâÎÄ¼ş
+    # æ¸…ç†å¤–éƒ¨æ¨¡æ‹Ÿæ–‡ä»¶
     os.remove(mock_in)
     os.remove(mock_out)
