@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - judge_db:/app/db          # persist SQLite across restarts
+    environment:
+      - DATABASE_PATH=/app/db/judge.db
+    restart: unless-stopped
+
+volumes:
+  judge_db:

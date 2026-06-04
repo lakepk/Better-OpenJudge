@@ -1,0 +1,22 @@
+FROM python:3.11-slim
+
+# g++ is required by the judge engine to compile C++ submissions
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# Separate directory for the SQLite database (mounted as volume)
+RUN mkdir -p /app/db
+
+EXPOSE 8080
+ENV PYTHONUNBUFFERED=1
+ENV DATABASE_PATH=/app/db/judge.db
+
+CMD ["gunicorn", "-b", "0.0.0.0:8080", "--access-logfile", "-", "web.run:app"]
