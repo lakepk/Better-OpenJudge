@@ -21,6 +21,9 @@ ENV/
 /temp_judge/
 /test_data/  # 如果测试数据太大，建议也不要放进代码仓库
 
+# 环境变量（含密钥等敏感信息）
+.env
+
 # IDE 与系统配置
 .vscode/
 .idea/

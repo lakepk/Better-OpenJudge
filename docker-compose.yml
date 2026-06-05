@@ -9,6 +9,7 @@ services:
       - judge_db:/app/db          # persist SQLite across restarts
     environment:
       - DATABASE_PATH=/app/db/judge.db
+      - SECRET_KEY=${SECRET_KEY}
     restart: unless-stopped
 
 volumes:

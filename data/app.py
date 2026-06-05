@@ -1,9 +1,11 @@
+import os
+
 from flask import Flask, render_template, request, redirect, url_for, session
 from functools import wraps
 from database import *
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-change-this-in-production'
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-use-env-var-in-production')
 
 # 启动时初始化数据库
 init_db()
@@ -45,7 +47,7 @@ def index():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     # 临时关闭公开注册
-    return render_template('login.html', error='注册功能暂时关闭', user=session)
+    return redirect(url_for('login', error='注册功能暂时关闭'))
     if 'user_id' in session:
         return redirect(url_for('index'))
 
@@ -101,7 +103,7 @@ def login():
         else:
             return render_template('login.html', error=result, user=session)
 
-    return render_template('login.html', user=session)
+    return render_template('login.html', error=request.args.get('error'), user=session)
 
 
 @app.route('/logout')
