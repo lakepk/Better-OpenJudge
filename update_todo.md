@@ -6,39 +6,176 @@
 
 ## 🔴 P0 — 安全性
 
-- [ ] **代码沙箱**：用户提交代码无隔离执行，能读写文件、联网、fork-bomb。用 Docker/nsjail/firejail 等实现沙箱执行
-- [ ] **CSRF 防护**：所有 POST 表单无跨站请求伪造保护。引入 flask-wtf 或手动 CSRF token 中间件
-- [ ] **登录限速**：登录接口无频率限制，可暴力破解。加 Flask-Limiter 或手动 IP 计数
-- [ ] **评测并发控制**：每个提交无上限创建线程，高负载服务器崩溃。改为 worker pool + 队列，限制同时评测数
+- [ ] **代码沙箱**
+
+  - **现状**：[judge/core/runner.py](judge/core/runner.py) 第 26 行通过 `subprocess.run()` 直接执行用户提交的编译后二进制，与宿主机共享文件系统、网络、进程空间。恶意代码可以读取 `/app/db/judge.db`（所有用户密码哈希和题目数据）、向外发起网络请求、fork-bomb 耗尽资源。
+  - **如何优化**：可用 Docker SDK 为每次评测启动临时容器（简单但慢），或用 nsjail/firejail 设置 chroot + seccomp + cgroup 限制（推荐，成熟 OJ 方案）。至少做到：禁止网络、限制内存和时间、限制子进程数、白名单允许的 syscall、只读挂载必要目录。
+  - **主要责任人**：judge
+
+- [ ] **CSRF 防护**
+
+  - **现状**：[data/app.py](data/app.py) 所有 POST 路由（提交代码、删除题目、管理用户、删除公告等）无任何跨站请求伪造保护。攻击者只需让管理员访问一个恶意页面，就能在管理员不知情时触发删除题目、禁用用户等操作。
+  - **如何优化**：引入 `flask-wtf` 为所有表单生成 CSRF token，或在 `@app.before_request` 中对 POST 请求校验自定义 CSRF header。模板中 `<form>` 加 `{{ csrf_token() }}`。
+  - **主要责任人**：data（模板 + 路由），web（如需中间件全局拦截）
+
+- [ ] **登录限速**
+
+  - **现状**：[data/app.py](data/app.py) `/login` 路由无任何频率限制，攻击者可无限尝试密码进行暴力破解。
+  - **如何优化**：引入 `Flask-Limiter`，对 `/login` 路由限制为每 IP 每分钟 5 次失败后锁定 15 分钟。或手动在 `database.py` 中记录失败次数和时间戳。
+  - **主要责任人**：data
+
+- [ ] **评测并发控制**
+
+  - **现状**：[web/bridge.py](web/bridge.py) 第 204 行每次提交直接 `threading.Thread(...).start()`，无上限。想象 50 个用户同时提交 → 50 个 g++ 编译 + 50 个程序同时跑 → CPU/内存瞬间打满，服务器 OOM。
+  - **如何优化**：引入 `concurrent.futures.ThreadPoolExecutor` 或 `queue.Queue` + worker 线程池，限制同时评测数（如 2-4 个）。超出排队等待。
+  - **主要责任人**：web（bridge.py）
+
+---
 
 ## 🟠 P1 — 核心功能
 
-- [ ] **评测队列**：worker pool 替代无限线程，支持排队、优先级、状态查询
-- [ ] **分页**：题目列表、提交列表、用户管理全部加 LIMIT/OFFSET 分页
-- [ ] **搜索与筛选**：题目支持关键词搜索，按难度/标签/已解决状态过滤
-- [ ] **排行榜**：用户按 AC 数/通过率排名，支持时间范围筛选
-- [ ] **Rejudge**：修改测试用例后可重判相关提交
-- [ ] **Special Judge**：支持自定义判定脚本（浮点容差、多解校验等）
-- [ ] **提交实时反馈**：可用轮询或 WebSocket 自动刷新评测状态
-- [ ] **比赛系统**：限时比赛、独立题目集、实时榜单
+- [ ] **评测队列与状态追踪**
+
+  - **现状**：当前是即抛线程，无队列、无优先级、无超时处理。如果 worker 崩溃，提交永远停在 "Pending" 状态。用户无法知道前面排了多少人。
+  - **如何优化**：实现 JobQueue 模型：提交进入队列 → worker 领取 → 评测 → 写入结果。支持查询队列位置、预估等待时间。崩溃的提交设置超时自动标记为 SE。
+  - **主要责任人**：web（bridge.py），data（需新增队列状态字段到 submissions 表）
+
+- [ ] **分页**
+
+  - **现状**：[data/database.py](data/database.py) 中 `get_all_problems`、`get_all_users`、`get_submissions_by_problem` 等函数全量查询无 LIMIT/OFFSET。数据超 100 条后页面加载巨慢。`get_submissions_by_user` 硬编码 `limit=50` 也不够。模板中无页码导航。
+  - **如何优化**：每个列表查询函数加 `page` 和 `per_page` 参数，SQL 加 `LIMIT ? OFFSET ?`。模板中生成页码条（上一页/下一页/跳转）。Flask 请求中读取 `request.args.get('page', 1)`。
+  - **主要责任人**：data（database.py + app.py + 模板）
+
+- [ ] **搜索与筛选**
+
+  - **现状**：[data/app.py](data/app.py) 题目列表页无任何搜索框或过滤控件，所有题目平铺直叙。用户无法按标题关键词搜索，无法按难度/标签/是否已 AC 筛选。
+  - **如何优化**：题目列表页顶部加搜索栏 + 筛选下拉。SQL 加 `WHERE title LIKE ?` 和难度/tag 过滤条件。标签筛选需 JOIN `problem_tags` 和 `tags` 表。
+  - **主要责任人**：data（app.py + database.py + 模板）
+
+- [ ] **排行榜**
+
+  - **现状**：无任何排名页面。用户无法看到谁解题最多、谁排名靠前。
+  - **如何优化**：数据库统计每个用户的 AC 数、提交数、通过率，新建 `/ranking` 路由展示。SQL 示例：`SELECT u.nickname, COUNT(DISTINCT s.problem_id) as ac_count FROM users u JOIN submissions s ON u.id=s.user_id WHERE s.status='AC' GROUP BY u.id ORDER BY ac_count DESC`。
+  - **主要责任人**：data（app.py + database.py + 模板）
+
+- [ ] **Rejudge（重判）**
+
+  - **现状**：修改题目测试用例后，该题所有的历史提交结果仍然是旧测试用例判的，无法批量重新评测。
+  - **如何优化**：管理员界面加"重判"按钮。调用 `bridge.judge_async()` 重新评测该题所有提交（或指定单个提交）。需新增 `/admin/rejudge/<problem_id>` 或 `/admin/rejudge_submission/<id>` 路由。
+  - **主要责任人**：data（app.py 路由 + 模板按钮）+ web（bridge 复用 judge_async）
+
+- [ ] **Special Judge（SPJ）**
+
+  - **现状**：[judge/core/checker.py](judge/core/checker.py) 仅支持 `diff` 严格文本比对。浮点数输出、多解问题、任意顺序输出等场景无法判定。
+  - **如何优化**：允许管理员为题目上传/指定一个 SPJ 脚本（Python），checker 判断是否使用 SPJ → 编译并执行 SPJ 脚本 → SPJ 脚本接收输入文件、用户输出、标准答案，返回 AC/WA。
+  - **主要责任人**：judge（checker.py + controller.py）+ data（题目编辑页加 SPJ 上传）
+
+- [ ] **提交实时反馈**
+
+  - **现状**：[data/templates/submission_detail.html](data/templates/submission_detail.html) 提交后是静态页面，状态为 "Pending" 时用户只能手动刷新浏览器。
+  - **如何优化**：前端用 JavaScript 每隔 2 秒 AJAX 轮询 `/api/submission/<id>/status` 返回 `{"status": "Pending|Judging|AC|WA|..."}`。status 变化时自动刷新整个页面或更新卡片。以后可升级为 WebSocket。
+  - **主要责任人**：data（API 端点 + 模板 JS）
+
+- [ ] **比赛系统**
+
+  - **现状**：完全缺失。无法创建限时比赛、无法设置比赛专用题目集、无实时计分板。
+  - **如何优化**：新增 `contests` 表（起止时间、标题、描述）、`contest_problems` 关联表（比赛→题目映射，可设不同分值）、`contest_registrations`（参赛登记）。新增 `/contests`、`/contest/<id>` 路由。比赛期间排行榜实时更新。**注：这是大功能，建议 P0-P1 其他项完成后再启动。**
+  - **主要责任人**：data（数据库 + 路由 + 模板）
+
+---
 
 ## 🟡 P2 — 体验与质量
 
-- [ ] **代码编辑器**：集成 Monaco Editor 或 CodeMirror，替代纯 textarea
-- [ ] **代码高亮显示**：提交详情页用 highlight.js 或 Prism 加语法高亮
-- [ ] **Markdown 渲染**：题目描述用 markdown 库渲染后输出，替代裸 HTML
-- [ ] **已解决标记**：题目列表显示用户是否已 AC（绿色勾等）
-- [ ] **响应式布局**：适配移动端，替换固定 900px 宽度
-- [ ] **REST API**：提供 JSON API 端点，支持 CLI 工具和 IDE 插件
-- [ ] **XSS 修复**：题目内容 `| safe` 改为经过清洗的安全渲染
+- [ ] **代码编辑器（Monaco/CodeMirror）**
+
+  - **现状**：[data/templates/submit.html](data/templates/submit.html) 第 24 行是纯 `<textarea>`，无行号、无语法高亮、无自动缩进、Tab 键不能正常输入。用户体验差且容易拼写错误。
+  - **如何优化**：引入 CodeMirror 6（轻量）或 Monaco Editor（VS Code 内核，较重）。CDN 加载 JS/CSS，一行 JS 初始化即可。根据选择的语言切换高亮模式（C++/Python）。
+  - **主要责任人**：data（submit.html 模板）
+
+- [ ] **代码语法高亮显示**
+
+  - **现状**：[data/templates/submission_detail.html](data/templates/submission_detail.html) 第 27 行代码放在 `<pre>` 标签里，纯单色文本，无语言相关的关键字着色。
+  - **如何优化**：引入 highlight.js 或 Prism.js（CDN），对 `<pre><code>` 中的代码按 `submission.language` 自动着色。
+  - **主要责任人**：data（submission_detail.html 模板）
+
+- [ ] **Markdown 渲染**
+
+  - **现状**：[data/templates/problem_detail.html](data/templates/problem_detail.html) 第 37-72 行用 `{{ problem.description | safe }}` 等直接输出 HTML。管理页面提示"支持 Markdown"但实际上不渲染。同时 `| safe` 带来了 XSS 风险。
+  - **如何优化**：引入 Python `markdown` 库（在 requirements.txt 中），将题目内容先 `markdown.markdown(text, extensions=['fenced_code', 'tables', 'codehilite'])` 渲染为 HTML，再通过 `| safe` 输出。Markdown 库本身会转义内嵌的 HTML，消除 XSS 风险。
+  - **主要责任人**：data（app.py 渲染逻辑）+ web（requirements.txt）
+
+- [ ] **已解决标记**
+
+  - **现状**：题目列表不显示用户是否已 AC — 这是几乎所有 OJ 的标准体验（绿色勾、红色叉）。
+  - **如何优化**：在 `get_all_problems` 中 JOIN 用户提交记录，返回每个题目对应当前用户的 `best_status`（AC/WA/None）。模板中用绿色勾 ✓ 或红色叉 ✗ 标识。
+  - **主要责任人**：data（database.py + 模板）
+
+- [ ] **响应式布局**
+
+  - **现状**：[data/templates/base.html](data/templates/base.html) 第 41 行 `.container { max-width: 900px; }` 固定宽度。手机访问需要水平滚动，基本不可用。
+  - **如何优化**：引入 Bootstrap 5 或 Tailwind CSS（CDN），替换手写 CSS。至少改用 `max-width: 900px; width: 95%;` 加 `@media` 断点适配小屏。导航栏在小屏上改为汉堡菜单。
+  - **主要责任人**：data（base.html + 各模板）
+
+- [ ] **REST API**
+
+  - **现状**：全部是 HTML 模板渲染，无 JSON API。无法开发 CLI 提交工具、VS Code 插件、手机 App。
+  - **如何优化**：新增 `/api/v1/` 蓝图，提供 `GET /api/v1/problems`、`POST /api/v1/submit`、`GET /api/v1/submission/<id>` 等端点。返回 JSON，用 token 认证（新增 `api_tokens` 表）。
+  - **主要责任人**：data（新蓝图 + 路由）
+
+- [ ] **XSS 修复**
+
+  - **现状**：[data/templates/problem_detail.html](data/templates/problem_detail.html) 中 `{{ problem.description | safe }}` 等直接渲染为 HTML。如果题目内容包含 `<script>alert(1)</script>`，会在所有查看该题的用户浏览器中执行。
+  - **如何优化**：与 Markdown 渲染合并处理 — `markdown` 库转义原始 HTML 标签，只允许安全的 Markdown 语法生成的 HTML 通过。移除裸 `| safe`，改为 `{{ rendered_description | safe }}`（rendered 变量由 Python 端 markdown 库生成）。
+  - **主要责任人**：data（app.py + 模板）
+
+---
 
 ## 🟢 P3 — 工程与运维
 
-- [ ] **SQLite 并发方案**：启用 WAL 模式 + 连接池，或迁移到 PostgreSQL
-- [ ] **日志系统**：全应用加结构化日志（Python logging 模块）
-- [ ] **健康检查端点**：添加 `/health` 供负载均衡和监控使用
-- [ ] **依赖版本锁定**：`gunicorn` 和 `werkzeug` 加版本号，或生成 `requirements.lock`
-- [ ] **数据库迁移**：引入 Alembic 管理 schema 变更
-- [ ] **清理重复 judge 包**：删除 `judge/judge/` 旧拷贝
-- [ ] **Windows 兼容**：`bridge.py` 中 `import resource` 加平台判断
-- [ ] **数据库自动备份**：cron 定时备份 SQLite 文件到外部存储
+- [ ] **SQLite 并发方案**
+
+  - **现状**：SQLite 默认 rollback journal 模式，写操作锁全库。当前架构有 3 个 gunicorn worker + judge 后台线程同时读写，高峰期必然 "database is locked"。
+  - **如何优化**：启用 WAL 模式（`PRAGMA journal_mode=WAL;`），读写互不阻塞。设置 `PRAGMA busy_timeout=5000;` 让写入等锁而非立即报错。若未来用户量增大，考虑迁移到 PostgreSQL。
+  - **主要责任人**：data（database.py `get_db()` 中加 PRAGMA）
+
+- [ ] **日志系统**
+
+  - **现状**：全应用零 `logging` 调用。唯一输出是 `print()`（init_db 里）、gunicorn access log 和异常 traceback。问题排查只能靠复现。
+  - **如何优化**：配置 Python `logging` 模块（JSON 格式输出到 stdout，Docker 自动收集）。在 bridge、app、database 关键路径加 `logger.info()` / `logger.error()`。记录：每次评测的开始/结束/耗时、数据库错误、用户登录失败。
+  - **主要责任人**：web（bridge.py）+ data（app.py + database.py）
+
+- [ ] **健康检查端点**
+
+  - **现状**：无 `/health` 或 `/ping`。Docker 的 `restart: unless-stopped` 只能检测进程崩溃，不能检测"进程活着但应用挂了"。
+  - **如何优化**：新增 `@app.route('/health')` 返回 200 + `{"status": "ok"}`。可扩展为检查数据库连接是否正常。
+  - **主要责任人**：data
+
+- [ ] **依赖版本锁定**
+
+  - **现状**：[requirements.txt](requirements.txt) 中 `gunicorn` 和 `werkzeug` 无版本号，`flask>=3.0` 范围太宽。`pip install` 可能拉到不兼容的新版本，构建不可重复。
+  - **如何优化**：运行 `pip freeze > requirements.lock` 锁定所有包的确切版本。`requirements.txt` 保留宽松约束，`requirements.lock` 用于生产构建。Dockerfile 中用 `requirements.lock` 安装。
+  - **主要责任人**：web
+
+- [ ] **数据库迁移**
+
+  - **现状**：[data/database.py](data/database.py) 用 `CREATE TABLE IF NOT EXISTS` 管理 schema。添加新列或索引只能手动执行 SQL，没有版本追踪，不知道当前数据库处于哪个 schema 版本。
+  - **如何优化**：引入 Alembic（Flask-Migrate），`alembic init` → 生成初始 migration → 以后每次改 schema 用 `alembic revision --autogenerate && alembic upgrade head`。迁移文件可提交 git 供队友同步。
+  - **主要责任人**：data
+
+- [ ] **清理重复 judge 包**
+
+  - **现状**：`judge/judge/` 是重构遗留的旧拷贝，其 `from config import RUN_DIR` 使用了错误的绝对 import（应为 `from judge.config import ...`），代码不可运行但会误导新人。
+  - **如何优化**：确认无引用后删除 `judge/judge/` 整个目录。
+  - **主要责任人**：judge
+
+- [ ] **Windows 开发兼容**
+
+  - **现状**：[web/bridge.py](web/bridge.py) 第 52 行 `import resource` 是 Unix-only 模块（用于 `getrusage` 测量内存）。Windows 上整个应用无法启动，影响本地开发调试。
+  - **如何优化**：改为 `try: import resource` 并包裹平台判断 `if sys.platform != 'win32'`。Windows 上用 `psutil.Process().memory_info()` 替代，或 Windows 上跳过内存测量只返回 0。
+  - **主要责任人**：web（bridge.py）
+
+- [ ] **数据库自动备份**
+
+  - **现状**：SQLite 数据库无任何备份机制。磁盘故障、误操作、容器重建时数据可能永久丢失。
+  - **如何优化**：宿主机上设 cron 任务，每天凌晨 `docker exec better-openjudge-web-1 sqlite3 /app/db/judge.db ".backup /app/db/backup_$(date +%Y%m%d).db"`。保留最近 7 天。或用 `rclone` 同步到云存储。
+  - **主要责任人**：web/运维（宿主机脚本）
