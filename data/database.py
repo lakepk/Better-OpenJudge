@@ -224,7 +224,7 @@ def get_all_problems(is_admin=False):
     if is_admin:
         cursor.execute("SELECT id, title, difficulty, time_limit, memory_limit, accepted_count, submission_count, is_visible, created_at FROM problems ORDER BY id DESC")
     else:
-        cursor.execute("SELECT id, title, difficulty, time_limit, accepted_count, created_at FROM problems WHERE is_visible = 1 ORDER BY id DESC")
+        cursor.execute("SELECT id, title, difficulty, time_limit, memory_limit, accepted_count, submission_count, created_at FROM problems WHERE is_visible = 1 ORDER BY id DESC")
     problems = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return problems
