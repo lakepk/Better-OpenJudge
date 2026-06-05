@@ -4,7 +4,7 @@ services:
   web:
     build: .
     ports:
-      - "8080:8080"
+      - "4399:4399"
     volumes:
       - judge_db:/app/db          # persist SQLite across restarts
     environment:

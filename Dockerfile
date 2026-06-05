@@ -15,8 +15,8 @@ COPY . .
 # Separate directory for the SQLite database (mounted as volume)
 RUN mkdir -p /app/db
 
-EXPOSE 8080
+EXPOSE 4399
 ENV PYTHONUNBUFFERED=1
 ENV DATABASE_PATH=/app/db/judge.db
 
-CMD ["gunicorn", "-w", "3", "-b", "0.0.0.0:8080", "--access-logfile", "-", "web.run:app"]
+CMD ["gunicorn", "-w", "3", "-b", "0.0.0.0:4399", "--access-logfile", "-", "web.run:app"]
