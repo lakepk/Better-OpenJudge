@@ -44,6 +44,8 @@ def index():
 # ==================== 用户系统 ====================
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    # 临时关闭公开注册
+    return render_template('login.html', error='注册功能暂时关闭', user=session)
     if 'user_id' in session:
         return redirect(url_for('index'))
 

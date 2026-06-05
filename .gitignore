@@ -11,6 +11,8 @@ ENV/
 # OpenJudge 本地数据库
 *.sqlite3
 *.db
+*/*.db
+
 
 # 评测机沙箱产生的临时文件和编译产物
 *.out
