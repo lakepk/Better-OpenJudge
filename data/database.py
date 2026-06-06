@@ -749,3 +749,121 @@ def get_contest_problems(contest_id):
     problems = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return problems
+
+
+# ==================== Ranking ====================
+
+def get_global_ranking(limit=50):
+    """Global ranking by AC count (practice submissions only, no contest submissions)."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT u.id, u.nickname, COUNT(DISTINCT s.problem_id) as ac_count,
+               COUNT(DISTINCT s.id) as submit_count
+        FROM users u
+        JOIN submissions s ON u.id = s.user_id
+        WHERE s.status = 'AC' AND s.contest_id IS NULL
+        GROUP BY u.id
+        ORDER BY ac_count DESC, u.nickname ASC
+        LIMIT ?
+    """, (limit,))
+    ranking = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return ranking
+
+
+def get_contest_ranking(contest_id):
+    """ACM-ICPC style ranking for a contest.
+
+    Sort by: AC count DESC → total penalty ASC → nickname ASC.
+    Penalty = (AC_time - contest_start) + (WA/TLE count before first AC × 20 min).
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Get contest start time
+    cursor.execute("SELECT start_time FROM contests WHERE id = ?", (contest_id,))
+    contest = cursor.fetchone()
+    if not contest:
+        conn.close()
+        return []
+    start_str = contest['start_time']
+
+    # Find all AC submissions in this contest — one per (user, problem), earliest AC
+    cursor.execute("""
+        SELECT s.user_id, u.nickname,
+               s.problem_id, p.title as problem_title,
+               s.created_at,
+               s.id as submission_id
+        FROM submissions s
+        JOIN users u ON s.user_id = u.id
+        JOIN problems p ON s.problem_id = p.id
+        WHERE s.contest_id = ? AND s.status = 'AC'
+          AND NOT EXISTS (
+              SELECT 1 FROM submissions earlier
+              WHERE earlier.user_id = s.user_id
+                AND earlier.problem_id = s.problem_id
+                AND earlier.contest_id = ?
+                AND earlier.status = 'AC'
+                AND earlier.created_at < s.created_at
+          )
+        ORDER BY s.user_id, s.created_at
+    """, (contest_id, contest_id))
+    ac_rows = [dict(row) for row in cursor.fetchall()]
+
+    if not ac_rows:
+        conn.close()
+        return []
+
+    # Build per-user stats
+    user_stats = {}
+    for row in ac_rows:
+        uid = row['user_id']
+        if uid not in user_stats:
+            user_stats[uid] = {
+                'user_id': uid,
+                'nickname': row['nickname'],
+                'ac_count': 0,
+                'total_penalty': 0,
+                'problems': {}
+            }
+        stats = user_stats[uid]
+
+        # Count WA/TLE before this AC for this problem
+        cursor.execute("""
+            SELECT COUNT(*) as wa_count FROM submissions
+            WHERE user_id = ? AND problem_id = ? AND contest_id = ?
+              AND status IN ('WA', 'TLE', 'RE', 'MLE')
+              AND created_at < ?
+        """, (uid, row['problem_id'], contest_id, row['created_at']))
+        wa_info = cursor.fetchone()
+        wa_count = wa_info['wa_count'] if wa_info else 0
+
+        # Penalty minutes
+        cursor.execute(
+            "SELECT (strftime('%%s', ?) - strftime('%%s', ?)) / 60.0 as penalty_min",
+            (row['created_at'], start_str)
+        )
+        time_penalty = cursor.fetchone()['penalty_min'] or 0
+        total = time_penalty + wa_count * 20
+
+        stats['ac_count'] += 1
+        stats['total_penalty'] += total
+        stats['problems'][row['problem_id']] = {
+            'problem_title': row['problem_title'],
+            'penalty': total,
+            'wa_count': wa_count,
+            'submission_id': row['submission_id'],
+        }
+
+    conn.close()
+
+    # Sort: AC count DESC → penalty ASC → nickname ASC
+    ranking = sorted(user_stats.values(),
+                     key=lambda x: (-x['ac_count'], x['total_penalty'], x['nickname']))
+
+    # Add rank numbers
+    for i, entry in enumerate(ranking):
+        entry['rank'] = i + 1
+
+    return ranking
