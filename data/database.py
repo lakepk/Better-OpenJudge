@@ -6,6 +6,7 @@ def get_db():
     """Get a connection to the database."""
     conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row  # Enable dict-like access to rows
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 def init_db():
@@ -346,6 +347,7 @@ def delete_problem(problem_id):
     cursor.execute("DELETE FROM problem_tags WHERE problem_id = ?", (problem_id,))
     cursor.execute("DELETE FROM test_cases WHERE problem_id = ?", (problem_id,))
     cursor.execute("DELETE FROM submissions WHERE problem_id = ?", (problem_id,))
+    cursor.execute("DELETE FROM contest_problems WHERE problem_id = ?", (problem_id,))
     cursor.execute("DELETE FROM problems WHERE id = ?", (problem_id,))
     conn.commit()
     conn.close()
