@@ -653,6 +653,8 @@ def delete_contest(contest_id):
     """Delete a contest and its problem associations."""
     conn = get_db()
     cursor = conn.cursor()
+    # Nullify contest_id on submissions that reference this contest
+    cursor.execute("UPDATE submissions SET contest_id = NULL WHERE contest_id = ?", (contest_id,))
     cursor.execute("DELETE FROM contest_problems WHERE contest_id = ?", (contest_id,))
     cursor.execute("DELETE FROM contests WHERE id = ?", (contest_id,))
     conn.commit()
