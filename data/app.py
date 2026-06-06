@@ -246,6 +246,15 @@ def submit_code(problem_id):
 def contest_list():
     is_admin = session.get('role') == 'admin'
     contests = get_all_contests(is_admin=is_admin)
+    from datetime import datetime
+    now = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+    for c in contests:
+        if c['start_time'] > now:
+            c['status'] = 'upcoming'
+        elif c['end_time'] < now:
+            c['status'] = 'ended'
+        else:
+            c['status'] = 'ongoing'
     return render_template('contests.html',
                            contests=contests,
                            user=session)
