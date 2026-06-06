@@ -172,6 +172,12 @@ def problem_detail(problem_id):
                                user=session), 404
 
     contest_id = request.args.get('contest_id')
+    if contest_id:
+        contest_id = int(contest_id)
+        contest_problems = get_contest_problems(contest_id)
+        contest_pids = [p['id'] for p in contest_problems]
+        if problem_id not in contest_pids:
+            contest_id = None  # Don't show banner for non-member problems
     return render_template('problem_detail.html',
                            problem=problem,
                            contest_id=contest_id,
@@ -212,6 +218,14 @@ def submit_code(problem_id):
         if not (contest['start_time'] <= now <= contest['end_time']):
             return render_template('error.html',
                                    message='比赛未开始或已结束，无法提交',
+                                   user=session), 403
+
+        # Verify problem belongs to this contest
+        contest_problems = get_contest_problems(contest_id)
+        contest_pids = [p['id'] for p in contest_problems]
+        if problem_id not in contest_pids:
+            return render_template('error.html',
+                                   message='该题目不属于此比赛',
                                    user=session), 403
 
     if request.method == 'POST':
