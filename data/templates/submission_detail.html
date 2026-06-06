@@ -1,6 +1,13 @@
 {% extends "base.html" %}
 {% block title %}提交 #{{ submission.id }} - LiteJudge{% endblock %}
 {% block content %}
+
+<!-- highlight.js -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/vs2015.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/cpp.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/python.min.js"></script>
+
 <div class="card">
     <h2>提交详情 #{{ submission.id }}</h2>
     <table class="mb-20">
@@ -24,6 +31,9 @@
 
 <div class="card">
     <h3>源代码</h3>
-    <pre style="background:#1e1e1e; color:#d4d4d4; padding:16px; border-radius:6px; overflow-x:auto; font-size:13px; line-height:1.5;">{{ submission.code }}</pre>
+    <pre><code class="language-{{ 'cpp' if submission.language == 'cpp' else 'python' }}">{{ submission.code }}</code></pre>
 </div>
+
+<script>hljs.highlightAll();</script>
+
 {% endblock %}

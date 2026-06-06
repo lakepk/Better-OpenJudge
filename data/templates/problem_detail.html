@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 {% block title %}{{ problem.title }} - LiteJudge{% endblock %}
 {% block content %}
+{% if contest_id %}
+<div class="card" style="background: #fffbe6; border-left: 4px solid #f39c12;">
+    <strong>🏆 来自比赛</strong>
+    <a href="/contest/{{ contest_id }}" style="margin-left: 12px;">← 返回比赛</a>
+</div>
+{% endif %}
 <div class="card">
     <h2>{{ problem.title }}</h2>
     <div class="mb-20">
@@ -21,7 +27,7 @@
     </p>
 
     {% if user and user.user_id %}
-        <a href="/problem/{{ problem.id }}/submit" class="btn btn-primary">提交代码</a>
+        <a href="/problem/{{ problem.id }}/submit{% if contest_id %}?contest_id={{ contest_id }}{% endif %}" class="btn btn-primary">提交代码</a>
     {% else %}
         <a href="/login" class="btn btn-primary">登录后提交</a>
     {% endif %}
