@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}{{ contest.title }} - 比赛详情 - LiteJudge{% endblock %}
+{% block content %}
+
+<div class="card">
+    <div class="flex-between mb-20">
+        <h2>🏆 {{ contest.title }}</h2>
+        <div>
+            {% if is_ongoing %}
+                <span style="display: inline-block; background: #fff3cd; color: #856404; padding: 6px 16px; border-radius: 12px; font-size: 14px; font-weight: 600;">● 进行中</span>
+            {% elif is_ended %}
+                <span style="display: inline-block; background: #d4edda; color: #155724; padding: 6px 16px; border-radius: 12px; font-size: 14px; font-weight: 600;">✓ 已结束</span>
+            {% else %}
+                <span style="display: inline-block; background: #e2e3e5; color: #383d41; padding: 6px 16px; border-radius: 12px; font-size: 14px; font-weight: 600;">○ 未开始</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <p class="text-muted mb-20">
+        比赛时间: {{ contest.start_time[:16] }} ~ {{ contest.end_time[:16] }}
+        &nbsp;|&nbsp; 创建者: {{ contest.creator_name }}
+    </p>
+
+    {% if contest.description %}
+    <div class="mb-20" style="line-height: 1.8;">
+        {{ contest.description }}
+    </div>
+    {% endif %}
+
+    {% if user and user.role == 'admin' %}
+    <div class="mb-20">
+        <a href="/admin/edit_contest/{{ contest.id }}" class="btn btn-secondary btn-sm">编辑比赛</a>
+        <form method="post" action="/admin/delete_contest/{{ contest.id }}" style="display:inline;" onsubmit="confirmDelete(this); return false;">
+            <button type="submit" class="btn btn-danger btn-sm">删除比赛</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<!-- 题目列表 -->
+<div class="card">
+    <h3>📝 比赛题目</h3>
+    {% if contest.problems %}
+    <table class="mt-20">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>标题</th>
+                <th>难度</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in contest.problems %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>
+                    <a href="/problem/{{ p.id }}?contest_id={{ contest.id }}">{{ p.title }}</a>
+                </td>
+                <td>
+                    <span class="difficulty
+                        {% if p.difficulty == 1 %}difficulty-easy
+                        {% elif p.difficulty == 2 %}difficulty-medium
+                        {% else %}difficulty-hard{% endif %}">
+                        {{ '★' * p.difficulty }}{{ '☆' * (3 - p.difficulty) }}
+                    </span>
+                </td>
+                <td>
+                    {% if is_ongoing and user and user.user_id %}
+                        <a href="/problem/{{ p.id }}/submit?contest_id={{ contest.id }}" class="btn btn-primary btn-sm">提交</a>
+                    {% elif not user or not user.user_id %}
+                        <a href="/login" class="btn btn-secondary btn-sm">登录后提交</a>
+                    {% else %}
+                        <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted text-center" style="padding: 30px;">暂无题目</p>
+    {% endif %}
+</div>
+
+<!-- 排行榜速览 -->
+{% if ranking %}
+<div class="card">
+    <div class="flex-between mb-20">
+        <h3>🏅 排行榜</h3>
+        <a href="/contest/{{ contest.id }}/ranking" class="btn btn-secondary btn-sm">查看完整排行 →</a>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>排名</th>
+                <th>用户</th>
+                <th>AC 数</th>
+                <th>罚时(分)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in ranking %}
+            <tr>
+                <td><strong>#{{ u.rank }}</strong></td>
+                <td>{{ u.nickname }}</td>
+                <td><span style="color: #27ae60; font-weight: bold;">{{ u.ac_count }}</span></td>
+                <td>{{ (u.total_penalty or 0) | round(1) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% endblock %}

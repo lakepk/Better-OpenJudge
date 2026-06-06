@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}{{ contest.title }} - 排行榜 - LiteJudge{% endblock %}
+{% block content %}
+
+<div class="card">
+    <div class="flex-between mb-20">
+        <h2>🏅 {{ contest.title }} — 排行榜</h2>
+        <a href="/contest/{{ contest.id }}" class="btn btn-secondary btn-sm">← 返回比赛</a>
+    </div>
+
+    <p class="text-muted mb-20">
+        规则: ACM-ICPC 赛制 — 按 AC 数降序排列，罚时 = 解题时间 + WA/TLE 次数 × 20 分钟
+    </p>
+
+    {% if ranking %}
+    <table>
+        <thead>
+            <tr>
+                <th>排名</th>
+                <th>用户</th>
+                <th>AC 数</th>
+                <th>罚时(分)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in ranking %}
+            <tr>
+                <td>
+                    {% if u.rank == 1 %}🥇
+                    {% elif u.rank == 2 %}🥈
+                    {% elif u.rank == 3 %}🥉
+                    {% else %}#{{ u.rank }}{% endif %}
+                </td>
+                <td><strong>{{ u.nickname }}</strong></td>
+                <td><span style="color: #27ae60; font-weight: bold;">{{ u.ac_count }}</span></td>
+                <td>{{ (u.total_penalty or 0) | round(1) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted text-center" style="padding: 40px;">暂无排行数据</p>
+    {% endif %}
+</div>
+
+{% endblock %}

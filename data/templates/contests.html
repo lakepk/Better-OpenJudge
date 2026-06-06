@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}比赛列表 - LiteJudge{% endblock %}
+{% block content %}
+
+<div class="card">
+    <h2>🏆 比赛列表</h2>
+
+    {% if contests %}
+    <div style="display: grid; gap: 12px; margin-top: 12px;">
+        {% for c in contests %}
+        <a href="/contest/{{ c.id }}" style="display: block; background: #fafafa; border-radius: 8px; padding: 20px; text-decoration: none; color: #333; border: 1px solid #eee; transition: box-shadow 0.15s;">
+            <div class="flex-between" style="align-items: flex-start;">
+                <div style="flex: 1;">
+                    <strong style="font-size: 18px; color: #1a1a2e;">{{ c.title }}</strong>
+                    {% if not c.is_visible %}<span class="text-muted">[隐藏]</span>{% endif %}
+                    {% if c.description %}
+                    <p class="text-muted" style="margin-top: 4px;">{{ c.description[:120] }}{% if c.description|length > 120 %}...{% endif %}</p>
+                    {% endif %}
+                </div>
+                <div style="text-align: right; flex-shrink: 0; margin-left: 16px;">
+                    {% if c.status == 'upcoming' %}
+                        <span style="display: inline-block; background: #e2e3e5; color: #383d41; padding: 4px 12px; border-radius: 12px; font-size: 13px;">未开始</span>
+                    {% elif c.status == 'ended' %}
+                        <span style="display: inline-block; background: #d4edda; color: #155724; padding: 4px 12px; border-radius: 12px; font-size: 13px;">已结束</span>
+                    {% else %}
+                        <span style="display: inline-block; background: #fff3cd; color: #856404; padding: 4px 12px; border-radius: 12px; font-size: 13px;">进行中</span>
+                    {% endif %}
+                    <p class="text-muted" style="margin-top: 8px; font-size: 12px;">
+                        {{ c.start_time[:16] }} ~ {{ c.end_time[:16] }}
+                    </p>
+                    <p class="text-muted" style="font-size: 11px;">创建者: {{ c.creator_name }}</p>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted text-center" style="padding: 40px;">暂无比赛</p>
+    {% endif %}
+</div>
+
+{% endblock %}
