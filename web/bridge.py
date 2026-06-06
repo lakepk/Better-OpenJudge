@@ -213,9 +213,9 @@ def judge_async(submission_id: int) -> None:
 _original_create = db_module.create_submission
 
 
-def _patched_create(user_id, problem_id, code, language='cpp'):
+def _patched_create(user_id, problem_id, code, language='cpp', contest_id=None):
     """Drop-in replacement that triggers the judge after insert."""
-    submission_id = _original_create(user_id, problem_id, code, language)
+    submission_id = _original_create(user_id, problem_id, code, language, contest_id)
     judge_async(submission_id)
     return submission_id
 

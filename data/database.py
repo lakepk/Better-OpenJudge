@@ -392,13 +392,13 @@ def get_all_tags():
 
 
 # Submissions' commmand
-def create_submission(user_id, problem_id, code, language='cpp'):
+def create_submission(user_id, problem_id, code, language='cpp', contest_id=None):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
-        """INSERT INTO submissions (user_id, problem_id, code, language) 
-           VALUES (?, ?, ?, ?)""",
-        (user_id, problem_id, code, language)
+        """INSERT INTO submissions (user_id, problem_id, code, language, contest_id)
+           VALUES (?, ?, ?, ?, ?)""",
+        (user_id, problem_id, code, language, contest_id)
     )
     submission_id = cursor.lastrowid
     conn.commit()
