@@ -1,17 +1,17 @@
 {% extends "base.html" %}
-{% block title %}{{ contest.title }} - 比赛详情 - LiteJudge{% endblock %}
+{% block title %}{{ contest.title }} - 比赛详情 - OpenJudge{% endblock %}
 {% block content %}
 
 <div class="card">
     <div class="flex-between mb-20">
-        <h2>🏆 {{ contest.title }}</h2>
+        <h2>{{ contest.title }}</h2>
         <div>
             {% if is_ongoing %}
-                <span style="display: inline-block; background: #fff3cd; color: #856404; padding: 6px 16px; border-radius: 12px; font-size: 14px; font-weight: 600;">● 进行中</span>
+                <span style="display: inline-block; background: #fff3cd; color: #856404; padding: 6px 16px; border-radius: 12px; font-size: 14px; font-weight: 600;">进行中</span>
             {% elif is_ended %}
-                <span style="display: inline-block; background: #d4edda; color: #155724; padding: 6px 16px; border-radius: 12px; font-size: 14px; font-weight: 600;">✓ 已结束</span>
+                <span style="display: inline-block; background: #d4edda; color: #155724; padding: 6px 16px; border-radius: 12px; font-size: 14px; font-weight: 600;">已结束</span>
             {% else %}
-                <span style="display: inline-block; background: #e2e3e5; color: #383d41; padding: 6px 16px; border-radius: 12px; font-size: 14px; font-weight: 600;">○ 未开始</span>
+                <span style="display: inline-block; background: #e2e3e5; color: #383d41; padding: 6px 16px; border-radius: 12px; font-size: 14px; font-weight: 600;">未开始</span>
             {% endif %}
         </div>
     </div>
@@ -39,7 +39,7 @@
 
 <!-- 题目列表 -->
 <div class="card">
-    <h3>📝 比赛题目</h3>
+    <h3>比赛题目</h3>
     {% if contest.problems %}
     <table class="mt-20">
         <thead>
@@ -87,7 +87,7 @@
 {% if ranking %}
 <div class="card">
     <div class="flex-between mb-20">
-        <h3>🏅 排行榜</h3>
+        <h3>排行榜</h3>
         <a href="/contest/{{ contest.id }}/ranking" class="btn btn-secondary btn-sm">查看完整排行 →</a>
     </div>
     <table>

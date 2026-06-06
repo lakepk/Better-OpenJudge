@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}{{ problem.title }} - LiteJudge{% endblock %}
+{% block title %}{{ problem.title }} - OpenJudge{% endblock %}
 {% block content %}
 {% if contest_id %}
 <div class="card" style="background: #fffbe6; border-left: 4px solid #f39c12;">
-    <strong>🏆 来自比赛</strong>
+    <strong>来自比赛</strong>
     <a href="/contest/{{ contest_id }}" style="margin-left: 12px;">← 返回比赛</a>
 </div>
 {% endif %}

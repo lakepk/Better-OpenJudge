@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}首页 - LiteJudge{% endblock %}
+{% block title %}首页 - OpenJudge{% endblock %}
 {% block content %}
 
 {% if announcements %}
 <div class="card" style="background: #fffbe6; border-left: 4px solid #f39c12;">
-    <h3>📢 公告</h3>
+    <h3>公告</h3>
     {% for a in announcements %}
     <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #f0e4a8;">
         <strong>{{ a.title }}</strong>
@@ -17,29 +17,24 @@
 <!-- 功能入口面板 -->
 <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px;">
     <a href="/problems" class="dashboard-card">
-        <div class="dashboard-card-icon">📝</div>
         <div class="dashboard-card-title">题库</div>
         <div class="dashboard-card-desc">浏览所有题目</div>
     </a>
     <a href="/contests" class="dashboard-card">
-        <div class="dashboard-card-icon">🏆</div>
         <div class="dashboard-card-title">比赛</div>
         <div class="dashboard-card-desc">参与限时竞赛</div>
     </a>
     <a href="/ranking" class="dashboard-card">
-        <div class="dashboard-card-icon">🏅</div>
         <div class="dashboard-card-title">排行榜</div>
         <div class="dashboard-card-desc">全站 AC 排名</div>
     </a>
     {% if user and user.user_id %}
     <a href="/profile" class="dashboard-card">
-        <div class="dashboard-card-icon">👤</div>
         <div class="dashboard-card-title">个人中心</div>
         <div class="dashboard-card-desc">我的提交与资料</div>
     </a>
     {% else %}
     <a href="/login" class="dashboard-card">
-        <div class="dashboard-card-icon">🔑</div>
         <div class="dashboard-card-title">登录</div>
         <div class="dashboard-card-desc">登录以提交代码</div>
     </a>
@@ -50,27 +45,22 @@
 {% if user and user.role == 'admin' %}
 <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 20px;">
     <a href="/admin/problems" class="dashboard-card dashboard-card-admin">
-        <div class="dashboard-card-icon">📋</div>
         <div class="dashboard-card-title">题目管理</div>
         <div class="dashboard-card-desc">创建/编辑题目</div>
     </a>
     <a href="/admin/users" class="dashboard-card dashboard-card-admin">
-        <div class="dashboard-card-icon">👥</div>
         <div class="dashboard-card-title">用户管理</div>
         <div class="dashboard-card-desc">查看/禁用用户</div>
     </a>
     <a href="/admin/announcements" class="dashboard-card dashboard-card-admin">
-        <div class="dashboard-card-icon">📢</div>
         <div class="dashboard-card-title">公告管理</div>
         <div class="dashboard-card-desc">发布首页公告</div>
     </a>
     <a href="/admin/contests" class="dashboard-card dashboard-card-admin">
-        <div class="dashboard-card-icon">🏗</div>
         <div class="dashboard-card-title">比赛管理</div>
         <div class="dashboard-card-desc">创建/管理比赛</div>
     </a>
     <a href="/admin/submissions" class="dashboard-card dashboard-card-admin">
-        <div class="dashboard-card-icon">📊</div>
         <div class="dashboard-card-title">提交总览</div>
         <div class="dashboard-card-desc">所有用户提交</div>
     </a>
@@ -81,7 +71,7 @@
 {% if top_users %}
 <div class="card">
     <div class="flex-between mb-20">
-        <h2>🏅 排行榜 TOP 5</h2>
+        <h2>排行榜 TOP 5</h2>
         <a href="/ranking" class="btn btn-secondary btn-sm">查看完整排行 →</a>
     </div>
     <table>
@@ -165,14 +155,11 @@
         box-shadow: 0 1px 3px rgba(0,0,0,0.08);
         transition: transform 0.15s, box-shadow 0.15s;
         color: #333;
+        border-left: 3px solid #5b7a9e;
     }
     .dashboard-card:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-    }
-    .dashboard-card-icon {
-        font-size: 32px;
-        margin-bottom: 8px;
     }
     .dashboard-card-title {
         font-weight: 600;
@@ -185,7 +172,7 @@
         color: #888;
     }
     .dashboard-card-admin {
-        border-top: 3px solid #e94560;
+        border-left: 3px solid #7a8a9e;
     }
 </style>
 

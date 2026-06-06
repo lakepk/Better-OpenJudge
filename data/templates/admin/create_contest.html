@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}{% if contest %}编辑比赛{% else %}创建比赛{% endif %} - LiteJudge{% endblock %}
+{% block title %}{% if contest %}编辑比赛{% else %}创建比赛{% endif %} - OpenJudge{% endblock %}
 {% block content %}
 
 <div class="card">
-    <h2>{% if contest %}编辑比赛{% else %}🏗 创建比赛{% endif %}</h2>
+    <h2>{% if contest %}编辑比赛{% else %}创建比赛{% endif %}</h2>
 
     {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
 
