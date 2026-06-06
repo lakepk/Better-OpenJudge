@@ -3,6 +3,7 @@ import os
 from flask import Flask, render_template, request, redirect, url_for, session
 from functools import wraps
 from database import *
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-use-env-var-in-production')
@@ -239,7 +240,6 @@ def contest_detail(contest_id):
                                user=session), 404
 
     # Check contest status
-    from datetime import datetime
     now = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
     is_ongoing = contest['start_time'] <= now <= contest['end_time']
     is_ended = now > contest['end_time']
@@ -260,6 +260,11 @@ def contest_ranking(contest_id):
     contest = get_contest_by_id(contest_id)
 
     if not contest:
+        return render_template('error.html',
+                               message='比赛不存在',
+                               user=session), 404
+
+    if not contest['is_visible'] and session.get('role') != 'admin':
         return render_template('error.html',
                                message='比赛不存在',
                                user=session), 404
