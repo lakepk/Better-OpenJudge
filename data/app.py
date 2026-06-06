@@ -9,6 +9,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'dev-use-env-var-in-production')
 
 # 启动时初始化数据库
 init_db()
+migrate_add_contest_id()
 
 
 # ==================== 权限装饰器 ====================

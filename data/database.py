@@ -81,6 +81,7 @@ def init_db():
             memory_used INTEGER DEFAULT 0,
             compiler_output TEXT DEFAULT '',
             judge_detail TEXT DEFAULT '',
+            contest_id INTEGER DEFAULT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id),
             FOREIGN KEY (problem_id) REFERENCES problems(id)
@@ -117,10 +118,49 @@ def init_db():
         )
     ''')
 
+    # Create contests table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS contests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            start_time TEXT NOT NULL,
+            end_time TEXT NOT NULL,
+            is_visible INTEGER DEFAULT 1,
+            created_by INTEGER NOT NULL,
+            created_at TEXT DEFAULT (datetime('now', 'localtime')),
+            FOREIGN KEY (created_by) REFERENCES users(id)
+        )
+    ''')
+
+    # Create contest_problems table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS contest_problems (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            contest_id INTEGER NOT NULL,
+            problem_id INTEGER NOT NULL,
+            sort_order INTEGER DEFAULT 0,
+            FOREIGN KEY (contest_id) REFERENCES contests(id) ON DELETE CASCADE,
+            FOREIGN KEY (problem_id) REFERENCES problems(id) ON DELETE CASCADE,
+            UNIQUE(contest_id, problem_id)
+        )
+    ''')
+
     conn.commit()
     conn.close()
     print("Database Initialized Successfully.")
 
+
+def migrate_add_contest_id():
+    """Add contest_id column to existing submissions table if missing."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA table_info(submissions)")
+    columns = [row['name'] for row in cursor.fetchall()]
+    if 'contest_id' not in columns:
+        cursor.execute("ALTER TABLE submissions ADD COLUMN contest_id INTEGER DEFAULT NULL")
+        conn.commit()
+    conn.close()
 
 
 
