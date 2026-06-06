@@ -1,30 +1,89 @@
 {% extends "base.html" %}
 {% block title %}提交代码 - {{ problem.title }} - LiteJudge{% endblock %}
 {% block content %}
+
+{% if contest %}
+<div class="card" style="background: #fffbe6; border-left: 4px solid #f39c12;">
+    <strong>🏆 比赛模式</strong> — {{ contest.title }}
+    <span class="text-muted" style="margin-left: 8px;">
+        比赛结束后提交将不再计入成绩
+    </span>
+    <a href="/contest/{{ contest.id }}" style="float: right; font-size: 13px;">← 返回比赛</a>
+</div>
+{% endif %}
+
 <div class="card">
     <h2>提交代码: {{ problem.title }}</h2>
 
     <p class="text-muted mb-20">
-        时间限制: {{ problem.time_limit }}ms | 
+        时间限制: {{ problem.time_limit }}ms |
         内存限制: {{ (problem.memory_limit / 1024) | round(1) }}MB
     </p>
 
     {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
 
-    <form method="post">
+    <form method="post" id="submit-form">
+        {% if contest_id %}
+        <input type="hidden" name="contest_id" value="{{ contest_id }}">
+        {% endif %}
+
         <div class="form-group">
             <label>编程语言</label>
-            <select name="language">
+            <select name="language" id="language-select">
                 <option value="cpp">C++</option>
                 <option value="python">Python</option>
             </select>
         </div>
+
         <div class="form-group">
             <label>代码</label>
-            <textarea name="code" class="code-editor" placeholder="在此粘贴你的代码..." required></textarea>
+            <div id="editor-container" style="height: 450px; border: 1px solid #333; border-radius: 6px;"></div>
+            <textarea name="code" id="code-textarea" style="display: none;"></textarea>
         </div>
-        <button type="submit" class="btn btn-primary">提交评测</button>
-        <a href="/problem/{{ problem.id }}" class="btn btn-secondary">返回题目</a>
+
+        <button type="submit" class="btn btn-primary" onclick="syncCode()">提交评测</button>
+        {% if contest_id %}
+            <a href="/contest/{{ contest_id }}" class="btn btn-secondary">返回比赛</a>
+        {% else %}
+            <a href="/problem/{{ problem.id }}" class="btn btn-secondary">返回题目</a>
+        {% endif %}
     </form>
 </div>
+
+<!-- Monaco Editor -->
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
+<script>
+    require.config({
+        paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs' }
+    });
+
+    require(['vs/editor/editor.main'], function () {
+        window.editor = monaco.editor.create(
+            document.getElementById('editor-container'),
+            {
+                value: "",
+                language: "cpp",
+                theme: "vs-dark",
+                fontSize: 14,
+                minimap: { enabled: false },
+                automaticLayout: true,
+                scrollBeyondLastLine: false,
+                lineNumbers: "on",
+                tabSize: 4,
+                renderLineHighlight: "all",
+                bracketPairColorization: { enabled: true },
+            }
+        );
+
+        document.getElementById('language-select').addEventListener('change', function () {
+            var lang = this.value === 'cpp' ? 'cpp' : 'python';
+            monaco.editor.setModelLanguage(window.editor.getModel(), lang);
+        });
+    });
+
+    function syncCode() {
+        document.getElementById('code-textarea').value = window.editor.getValue();
+    }
+</script>
+
 {% endblock %}
