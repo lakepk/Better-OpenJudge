@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}{% if contest %}编辑比赛{% else %}创建比赛{% endif %} - LiteJudge{% endblock %}
+{% block content %}
+
+<div class="card">
+    <h2>{% if contest %}编辑比赛{% else %}🏗 创建比赛{% endif %}</h2>
+
+    {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+    <form method="post">
+        <div class="form-group">
+            <label>比赛标题</label>
+            <input type="text" name="title" value="{{ contest.title if contest else '' }}" required>
+        </div>
+
+        <div class="form-group">
+            <label>比赛描述</label>
+            <textarea name="description" rows="4">{{ contest.description if contest else '' }}</textarea>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div class="form-group">
+                <label>开始时间</label>
+                <input type="datetime-local" name="start_time"
+                       value="{{ contest.start_time[:16] if contest else '' }}" required>
+                <span class="text-muted">格式: YYYY-MM-DD HH:MM</span>
+            </div>
+            <div class="form-group">
+                <label>结束时间</label>
+                <input type="datetime-local" name="end_time"
+                       value="{{ contest.end_time[:16] if contest else '' }}" required>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>可见性</label>
+            <select name="is_visible">
+                <option value="1" {% if not contest or contest.is_visible %}selected{% endif %}>可见</option>
+                <option value="0" {% if contest and not contest.is_visible %}selected{% endif %}>隐藏</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>题目列表（用英文逗号分隔的题目 ID）</label>
+            <input type="text" name="problem_ids" placeholder="例如: 1,2,3,5"
+                   value="{% if contest %}{% for p in contest.problems %}{{ p.id }}{% if not loop.last %},{% endif %}{% endfor %}{% endif %}">
+            <span class="text-muted">输入题目 ID，用逗号分隔</span>
+        </div>
+
+        {% if problems %}
+        <div class="form-group" style="background: #fafafa; padding: 12px; border-radius: 6px;">
+            <label>现有题目参考：</label>
+            <div style="font-size: 13px; color: #666;">
+                {% for p in problems %}
+                    <span style="display: inline-block; margin: 2px;">#{{ p.id }}-{{ p.title }}{% if not loop.last %},{% endif %}</span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="mt-20">
+            <button type="submit" class="btn btn-primary">
+                {% if contest %}保存修改{% else %}创建比赛{% endif %}
+            </button>
+            <a href="/admin/contests" class="btn btn-secondary">返回</a>
+        </div>
+    </form>
+</div>
+
+{% endblock %}
