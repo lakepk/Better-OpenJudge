@@ -610,3 +610,140 @@ def get_test_cases(problem_id):
     cases = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return cases
+
+
+# ==================== Contests ====================
+
+def create_contest(title, description, start_time, end_time, created_by, is_visible=1):
+    """Create a new contest. Returns the new contest_id."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO contests (title, description, start_time, end_time, is_visible, created_by) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (title, description, start_time, end_time, is_visible, created_by)
+    )
+    contest_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return contest_id
+
+
+def update_contest(contest_id, **kwargs):
+    """Update contest fields. Allowed: title, description, start_time, end_time, is_visible."""
+    allowed = ['title', 'description', 'start_time', 'end_time', 'is_visible']
+    updates = []
+    values = []
+    for key, value in kwargs.items():
+        if key in allowed:
+            updates.append(f"{key} = ?")
+            values.append(value)
+    if not updates:
+        return False
+    values.append(contest_id)
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(f"UPDATE contests SET {', '.join(updates)} WHERE id = ?", values)
+    conn.commit()
+    conn.close()
+    return True
+
+
+def delete_contest(contest_id):
+    """Delete a contest and its problem associations."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM contest_problems WHERE contest_id = ?", (contest_id,))
+    cursor.execute("DELETE FROM contests WHERE id = ?", (contest_id,))
+    conn.commit()
+    conn.close()
+
+
+def get_all_contests(is_admin=False):
+    """Return all visible contests (admin sees all)."""
+    conn = get_db()
+    cursor = conn.cursor()
+    if is_admin:
+        cursor.execute(
+            "SELECT c.*, u.username as creator_name "
+            "FROM contests c JOIN users u ON c.created_by = u.id "
+            "ORDER BY c.start_time DESC"
+        )
+    else:
+        cursor.execute(
+            "SELECT c.*, u.username as creator_name "
+            "FROM contests c JOIN users u ON c.created_by = u.id "
+            "WHERE c.is_visible = 1 "
+            "ORDER BY c.start_time DESC"
+        )
+    contests = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return contests
+
+
+def get_contest_by_id(contest_id):
+    """Get a single contest with creator name and associated problems."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT c.*, u.username as creator_name "
+        "FROM contests c JOIN users u ON c.created_by = u.id "
+        "WHERE c.id = ?", (contest_id,)
+    )
+    contest = cursor.fetchone()
+    if contest:
+        contest = dict(contest)
+        # Get problems in this contest
+        cursor.execute(
+            "SELECT p.id, p.title, p.difficulty, cp.sort_order "
+            "FROM contest_problems cp "
+            "JOIN problems p ON cp.problem_id = p.id "
+            "WHERE cp.contest_id = ? "
+            "ORDER BY cp.sort_order, cp.id",
+            (contest_id,)
+        )
+        contest['problems'] = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return contest if contest else None
+
+
+def add_problem_to_contest(contest_id, problem_id, sort_order=0):
+    """Associate a problem with a contest."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT OR IGNORE INTO contest_problems (contest_id, problem_id, sort_order) "
+        "VALUES (?, ?, ?)",
+        (contest_id, problem_id, sort_order)
+    )
+    conn.commit()
+    conn.close()
+
+
+def remove_problem_from_contest(contest_id, problem_id):
+    """Remove a problem from a contest."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "DELETE FROM contest_problems WHERE contest_id = ? AND problem_id = ?",
+        (contest_id, problem_id)
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_contest_problems(contest_id):
+    """Get all problems in a contest, ordered by sort_order."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT p.*, cp.sort_order "
+        "FROM contest_problems cp "
+        "JOIN problems p ON cp.problem_id = p.id "
+        "WHERE cp.contest_id = ? "
+        "ORDER BY cp.sort_order, cp.id",
+        (contest_id,)
+    )
+    problems = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return problems
