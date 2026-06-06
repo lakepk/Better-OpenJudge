@@ -541,6 +541,104 @@ def admin_delete_announcement(announcement_id):
     return redirect(url_for('admin_announcement_list'))
 
 
+# ==================== 管理员 - 比赛管理 ====================
+@app.route('/admin/contests')
+@login_required
+@admin_required
+def admin_contest_list():
+    contests = get_all_contests(is_admin=True)
+    return render_template('admin/contests.html',
+                           contests=contests,
+                           user=session)
+
+
+@app.route('/admin/create_contest', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def admin_create_contest():
+    if request.method == 'POST':
+        title = request.form.get('title', '').strip()
+        description = request.form.get('description', '')
+        start_time = request.form.get('start_time', '')
+        end_time = request.form.get('end_time', '')
+        is_visible = int(request.form.get('is_visible', 1))
+        problem_ids = request.form.get('problem_ids', '')
+
+        if not title or not start_time or not end_time:
+            return render_template('admin/create_contest.html',
+                                   error='标题、开始时间和结束时间不能为空',
+                                   user=session)
+
+        contest_id = create_contest(title=title,
+                                     description=description,
+                                     start_time=start_time,
+                                     end_time=end_time,
+                                     created_by=session['user_id'],
+                                     is_visible=is_visible)
+
+        # Associate problems
+        if problem_ids:
+            for pid_str in problem_ids.split(','):
+                pid = pid_str.strip()
+                if pid.isdigit():
+                    add_problem_to_contest(contest_id, int(pid))
+
+        return redirect(url_for('contest_detail', contest_id=contest_id))
+
+    # GET: show empty form
+    problems = get_all_problems(is_admin=True)
+    return render_template('admin/create_contest.html',
+                           problems=problems,
+                           user=session)
+
+
+@app.route('/admin/edit_contest/<int:contest_id>', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def admin_edit_contest(contest_id):
+    contest = get_contest_by_id(contest_id)
+    if not contest:
+        return render_template('error.html',
+                               message='比赛不存在',
+                               user=session), 404
+
+    if request.method == 'POST':
+        update_data = {
+            'title': request.form.get('title', '').strip(),
+            'description': request.form.get('description', ''),
+            'start_time': request.form.get('start_time', ''),
+            'end_time': request.form.get('end_time', ''),
+            'is_visible': int(request.form.get('is_visible', 1))
+        }
+        update_contest(contest_id, **update_data)
+
+        # Rebuild problem associations
+        problem_ids = request.form.get('problem_ids', '')
+        for p in contest.get('problems', []):
+            remove_problem_from_contest(contest_id, p['id'])
+        if problem_ids:
+            for pid_str in problem_ids.split(','):
+                pid = pid_str.strip()
+                if pid.isdigit():
+                    add_problem_to_contest(contest_id, int(pid))
+
+        return redirect(url_for('contest_detail', contest_id=contest_id))
+
+    problems = get_all_problems(is_admin=True)
+    return render_template('admin/create_contest.html',
+                           contest=contest,
+                           problems=problems,
+                           user=session)
+
+
+@app.route('/admin/delete_contest/<int:contest_id>', methods=['POST'])
+@login_required
+@admin_required
+def admin_delete_contest(contest_id):
+    delete_contest(contest_id)
+    return redirect(url_for('admin_contest_list'))
+
+
 # ==================== 启动应用 ====================
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
