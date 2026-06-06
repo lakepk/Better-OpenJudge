@@ -214,6 +214,63 @@ def submit_code(problem_id):
                            problem=problem,
                            user=session)
 
+# ==================== 比赛系统 ====================
+@app.route('/contests')
+def contest_list():
+    is_admin = session.get('role') == 'admin'
+    contests = get_all_contests(is_admin=is_admin)
+    return render_template('contests.html',
+                           contests=contests,
+                           user=session)
+
+
+@app.route('/contest/<int:contest_id>')
+def contest_detail(contest_id):
+    contest = get_contest_by_id(contest_id)
+
+    if not contest:
+        return render_template('error.html',
+                               message='比赛不存在',
+                               user=session), 404
+
+    if not contest['is_visible'] and session.get('role') != 'admin':
+        return render_template('error.html',
+                               message='比赛不存在',
+                               user=session), 404
+
+    # Check contest status
+    from datetime import datetime
+    now = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+    is_ongoing = contest['start_time'] <= now <= contest['end_time']
+    is_ended = now > contest['end_time']
+
+    # Get compact ranking (top 10)
+    ranking = get_contest_ranking(contest_id)[:10] if is_ongoing or is_ended else []
+
+    return render_template('contest_detail.html',
+                           contest=contest,
+                           is_ongoing=is_ongoing,
+                           is_ended=is_ended,
+                           ranking=ranking,
+                           user=session)
+
+
+@app.route('/contest/<int:contest_id>/ranking')
+def contest_ranking(contest_id):
+    contest = get_contest_by_id(contest_id)
+
+    if not contest:
+        return render_template('error.html',
+                               message='比赛不存在',
+                               user=session), 404
+
+    ranking = get_contest_ranking(contest_id)
+
+    return render_template('contest_ranking.html',
+                           contest=contest,
+                           ranking=ranking,
+                           user=session)
+
 
 # ==================== 提交记录 ====================
 @app.route('/submissions')
