@@ -39,10 +39,12 @@ def admin_required(f):
 def index():
     announcements = get_announcements()
     problems = get_all_problems(is_admin=(session.get('role') == 'admin'))
+    top_users = get_global_ranking(limit=5)
     return render_template('index.html',
                            user=session,
                            problems=problems,
-                           announcements=announcements)
+                           announcements=announcements,
+                           top_users=top_users)
 
 
 # ==================== 用户系统 ====================
@@ -169,8 +171,10 @@ def problem_detail(problem_id):
                                message='题目不存在',
                                user=session), 404
 
+    contest_id = request.args.get('contest_id')
     return render_template('problem_detail.html',
                            problem=problem,
+                           contest_id=contest_id,
                            user=session)
 
 
@@ -189,6 +193,27 @@ def submit_code(problem_id):
                                message='题目不存在',
                                user=session), 404
 
+    # Read contest_id from query param (GET) or form (POST)
+    contest_id = request.args.get('contest_id') or request.form.get('contest_id')
+    if contest_id:
+        contest_id = int(contest_id)
+    else:
+        contest_id = None
+
+    # If submitting within a contest, verify contest is ongoing
+    contest = None
+    if contest_id:
+        contest = get_contest_by_id(contest_id)
+        if not contest:
+            return render_template('error.html',
+                                   message='比赛不存在',
+                                   user=session), 404
+        now = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+        if not (contest['start_time'] <= now <= contest['end_time']):
+            return render_template('error.html',
+                                   message='比赛未开始或已结束，无法提交',
+                                   user=session), 403
+
     if request.method == 'POST':
         code = request.form.get('code', '')
         language = request.form.get('language', 'cpp')
@@ -196,23 +221,24 @@ def submit_code(problem_id):
         if not code.strip():
             return render_template('submit.html',
                                    problem=problem,
+                                   contest_id=contest_id,
+                                   contest=contest,
                                    user=session,
                                    error='代码不能为空')
 
-        # 创建提交记录
         submission_id = create_submission(session['user_id'],
                                           problem_id,
                                           code,
-                                          language)
-
-        # TODO: 对接评测机
-        # judge_submission(submission_id)
+                                          language,
+                                          contest_id=contest_id)
 
         return redirect(url_for('submission_detail',
                                 submission_id=submission_id))
 
     return render_template('submit.html',
                            problem=problem,
+                           contest_id=contest_id,
+                           contest=contest,
                            user=session)
 
 # ==================== 比赛系统 ====================
@@ -277,6 +303,14 @@ def contest_ranking(contest_id):
                            user=session)
 
 
+@app.route('/ranking')
+def global_ranking():
+    ranking = get_global_ranking(limit=50)
+    return render_template('ranking.html',
+                           ranking=ranking,
+                           user=session)
+
+
 # ==================== 提交记录 ====================
 @app.route('/submissions')
 @login_required
@@ -302,6 +336,17 @@ def submission_detail(submission_id):
         return render_template('error.html',
                                message='无权查看此提交',
                                user=session), 403
+
+    # 比赛中提交：比赛进行中时，仅提交者本人和管理员可查看
+    if submission.get('contest_id'):
+        contest = get_contest_by_id(submission['contest_id'])
+        if contest:
+            now = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+            is_ongoing = contest['start_time'] <= now <= contest['end_time']
+            if is_ongoing and submission['user_id'] != session['user_id'] and session.get('role') != 'admin':
+                return render_template('error.html',
+                                       message='比赛进行中，暂不可查看他人提交',
+                                       user=session), 403
 
     return render_template('submission_detail.html',
                            submission=submission,
