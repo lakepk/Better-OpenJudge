@@ -49,23 +49,24 @@ from judge.core.controller import JudgeController
 from judge.core.runner import Runner
 
 # ── Fix: runner.py hardcodes "memory":0 — monkey-patch real measurement ──
-import resource
+if sys.platform != 'win32':
+    import resource
 
-_original_run_single_case = Runner.run_single_case
+    _original_run_single_case = Runner.run_single_case
 
-def _patched_run_single_case(self, input_file, output_file, time_limit, memory_limit):
-    """Wrapper that adds actual memory measurement via getrusage()."""
-    before = resource.getrusage(resource.RUSAGE_CHILDREN)
-    result = _original_run_single_case(self, input_file, output_file,
-                                       time_limit, memory_limit)
-    after = resource.getrusage(resource.RUSAGE_CHILDREN)
-    # ru_maxrss is in KB on Linux; convert to MB (the unit the DB expects)
-    memory_kb = after.ru_maxrss - before.ru_maxrss
-    if memory_kb > 0:
-        result['memory'] = round(memory_kb / 1024, 2)
-    return result
+    def _patched_run_single_case(self, input_file, output_file, time_limit, memory_limit):
+        """Wrapper that adds actual memory measurement via getrusage()."""
+        before = resource.getrusage(resource.RUSAGE_CHILDREN)
+        result = _original_run_single_case(self, input_file, output_file,
+                                           time_limit, memory_limit)
+        after = resource.getrusage(resource.RUSAGE_CHILDREN)
+        # ru_maxrss is in KB on Linux; convert to MB (the unit the DB expects)
+        memory_kb = after.ru_maxrss - before.ru_maxrss
+        if memory_kb > 0:
+            result['memory'] = round(memory_kb / 1024, 2)
+        return result
 
-Runner.run_single_case = _patched_run_single_case
+    Runner.run_single_case = _patched_run_single_case
 
 # ── Status mapping: JudgeStatus strings → DB short codes ────
 _STATUS_MAP = {
