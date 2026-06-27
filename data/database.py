@@ -1,4 +1,5 @@
 import sqlite3
+import secrets
 from werkzeug.security import generate_password_hash, check_password_hash
 
 DATABASE = 'judge.db'
@@ -51,6 +52,8 @@ def init_db():
             is_visible BOOLEAN DEFAULT 1,
             accepted_count INTEGER DEFAULT 0,
             submission_count INTEGER DEFAULT 0,
+            spj_script TEXT DEFAULT '',
+            use_spj BOOLEAN DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
@@ -85,6 +88,7 @@ def init_db():
             memory_used INTEGER DEFAULT 0,
             compiler_output TEXT DEFAULT '',
             judge_detail TEXT DEFAULT '',
+            queue_position INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id),
             FOREIGN KEY (problem_id) REFERENCES problems(id)
@@ -121,12 +125,76 @@ def init_db():
         )
     ''')
 
+    # Create contests table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS contests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            start_time TIMESTAMP NOT NULL,
+            end_time TIMESTAMP NOT NULL,
+            is_visible BOOLEAN DEFAULT 1,
+            created_by INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (created_by) REFERENCES users(id)
+        )
+    ''')
+
+    # Create contest_problems table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS contest_problems (
+            contest_id INTEGER NOT NULL,
+            problem_id INTEGER NOT NULL,
+            problem_order INTEGER DEFAULT 1,
+            score INTEGER DEFAULT 100,
+            PRIMARY KEY (contest_id, problem_id),
+            FOREIGN KEY (contest_id) REFERENCES contests(id),
+            FOREIGN KEY (problem_id) REFERENCES problems(id)
+        )
+    ''')
+
+    # Create contest_registrations table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS contest_registrations (
+            contest_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (contest_id, user_id),
+            FOREIGN KEY (contest_id) REFERENCES contests(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    ''')
+
+    # Create api_tokens table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS api_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            token TEXT UNIQUE NOT NULL,
+            description TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    ''')
+
     try:
         cursor.execute("ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
         pass
     try:
         cursor.execute("ALTER TABLE users ADD COLUMN locked_until TIMESTAMP")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        cursor.execute("ALTER TABLE problems ADD COLUMN spj_script TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        cursor.execute("ALTER TABLE problems ADD COLUMN use_spj BOOLEAN DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        cursor.execute("ALTER TABLE submissions ADD COLUMN queue_position INTEGER")
     except sqlite3.OperationalError:
         pass
 
@@ -374,10 +442,13 @@ def get_problem_by_id(problem_id):
     return problem
 
 
-def create_problem(title, description, input_format, output_format, sample_input, sample_output, hint='', source='', difficulty=1, time_limit=1000, memory_limit=65536):
+def create_problem(title, description, input_format, output_format, sample_input, sample_output, hint='', source='', difficulty=1, time_limit=1000, memory_limit=65536, use_spj=0, spj_script=''):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO problems (title, description, input_format, output_format,sample_input, sample_output, hint, source,difficulty, time_limit, memory_limit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (title, description, input_format, output_format, sample_input, sample_output, hint, source, difficulty, time_limit, memory_limit))
+    cursor.execute(
+        "INSERT INTO problems (title, description, input_format, output_format, sample_input, sample_output, hint, source, difficulty, time_limit, memory_limit, use_spj, spj_script) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (title, description, input_format, output_format, sample_input, sample_output, hint, source, difficulty, time_limit, memory_limit, use_spj, spj_script)
+    )
     problem_id = cursor.lastrowid
     conn.commit()
     conn.close()
@@ -401,7 +472,7 @@ def add_tag_to_problem(problem_id, tag_name):
 
 def update_problem(problem_id, **kwargs):
     allowed_fields = [
-        'title', 'description', 'input_format', 'output_format', 'sample_input', 'sample_output', 'hint', 'source', 'difficulty', 'time_limit', 'memory_limit', 'is_visible'
+        'title', 'description', 'input_format', 'output_format', 'sample_input', 'sample_output', 'hint', 'source', 'difficulty', 'time_limit', 'memory_limit', 'is_visible', 'spj_script', 'use_spj'
     ]
     updates = []
     values = []
@@ -599,6 +670,44 @@ def update_problem_stats(problem_id):
     conn.close()
 
 
+def get_submission_ids_by_problem(problem_id):
+    """获取某个题目的所有提交 ID 列表"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id FROM submissions WHERE problem_id = ? ORDER BY id",
+        (problem_id,)
+    )
+    ids = [row['id'] for row in cursor.fetchall()]
+    conn.close()
+    return ids
+
+
+def reset_submission_for_rejudge(submission_id):
+    """将单个提交重置为 Pending 状态以待重判"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE submissions SET status = 'Pending', score = 0, time_used = 0, memory_used = 0, compiler_output = '', judge_detail = '' WHERE id = ?",
+        (submission_id,)
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_queue_position(submission_id):
+    """查询某提交在 Pending 队列中的位置"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT COUNT(*) as pos FROM submissions WHERE status = 'Pending' AND id <= ?",
+        (submission_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return row['pos'] if row else 0
+
+
 def get_submissions_by_problem(problem_id, page=1, per_page=20):
     conn = get_db()
     cursor = conn.cursor()
@@ -700,6 +809,262 @@ def delete_announcement(announcement_id):
     conn.close()
 
 
+# API tokens' command
+
+def create_api_token(user_id, description=''):
+    """为用户创建 API token"""
+    conn = get_db()
+    cursor = conn.cursor()
+    token = secrets.token_hex(32)
+    cursor.execute(
+        "INSERT INTO api_tokens (user_id, token, description) VALUES (?, ?, ?)",
+        (user_id, token, description)
+    )
+    conn.commit()
+    conn.close()
+    return token
+
+
+def get_user_by_token(token):
+    """通过 API token 获取用户，失败返回 None"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT u.* FROM users u
+        JOIN api_tokens t ON u.id = t.user_id
+        WHERE t.token = ? AND u.is_active = 1
+    """, (token,))
+    user = cursor.fetchone()
+    conn.close()
+    return dict(user) if user else None
+
+
+def get_user_tokens(user_id):
+    """获取某用户的所有 API token（不返回完整 token 字符串）"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id, description, created_at FROM api_tokens WHERE user_id = ? ORDER BY created_at DESC",
+        (user_id,)
+    )
+    tokens = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return tokens
+
+
+def delete_api_token(token_id, user_id):
+    """删除 API token"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "DELETE FROM api_tokens WHERE id = ? AND user_id = ?",
+        (token_id, user_id)
+    )
+    conn.commit()
+    conn.close()
+
+
+# Contests' command
+
+def create_contest(title, description, start_time, end_time, created_by, is_visible=1):
+    """创建比赛"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO contests (title, description, start_time, end_time, created_by, is_visible) VALUES (?, ?, ?, ?, ?, ?)",
+        (title, description, start_time, end_time, created_by, is_visible)
+    )
+    contest_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return contest_id
+
+
+def update_contest(contest_id, **kwargs):
+    """更新比赛信息"""
+    allowed_fields = ['title', 'description', 'start_time', 'end_time', 'is_visible']
+    updates = []
+    values = []
+    for key, value in kwargs.items():
+        if key in allowed_fields:
+            updates.append(f"{key} = ?")
+            values.append(value)
+    if not updates:
+        return False
+    values.append(contest_id)
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        f"UPDATE contests SET {', '.join(updates)} WHERE id = ?",
+        values
+    )
+    conn.commit()
+    conn.close()
+    return True
+
+
+def delete_contest(contest_id):
+    """删除比赛及其关联数据"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM contest_registrations WHERE contest_id = ?", (contest_id,))
+    cursor.execute("DELETE FROM contest_problems WHERE contest_id = ?", (contest_id,))
+    cursor.execute("DELETE FROM contests WHERE id = ?", (contest_id,))
+    conn.commit()
+    conn.close()
+
+
+def get_all_contests(include_hidden=False, page=1, per_page=20):
+    """获取比赛列表"""
+    conn = get_db()
+    cursor = conn.cursor()
+    offset = (page - 1) * per_page
+
+    if include_hidden:
+        cursor.execute("SELECT COUNT(*) as cnt FROM contests")
+    else:
+        cursor.execute("SELECT COUNT(*) as cnt FROM contests WHERE is_visible = 1")
+    total = cursor.fetchone()['cnt']
+
+    if include_hidden:
+        cursor.execute(
+            "SELECT * FROM contests ORDER BY start_time DESC LIMIT ? OFFSET ?",
+            (per_page, offset)
+        )
+    else:
+        cursor.execute(
+            "SELECT * FROM contests WHERE is_visible = 1 ORDER BY start_time DESC LIMIT ? OFFSET ?",
+            (per_page, offset)
+        )
+    contests = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return contests, total
+
+
+def get_contest_by_id(contest_id):
+    """获取比赛详情，含题目列表和参赛人数"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM contests WHERE id = ?", (contest_id,))
+    contest = cursor.fetchone()
+    if not contest:
+        conn.close()
+        return None
+
+    contest = dict(contest)
+
+    # 关联题目
+    cursor.execute("""
+        SELECT p.id, p.title, p.difficulty, cp.problem_order, cp.score as contest_score
+        FROM contest_problems cp
+        JOIN problems p ON cp.problem_id = p.id
+        WHERE cp.contest_id = ?
+        ORDER BY cp.problem_order
+    """, (contest_id,))
+    contest['problems'] = [dict(row) for row in cursor.fetchall()]
+
+    # 参赛人数
+    cursor.execute("SELECT COUNT(*) as cnt FROM contest_registrations WHERE contest_id = ?", (contest_id,))
+    contest['registrations_count'] = cursor.fetchone()['cnt']
+
+    conn.close()
+    return contest
+
+
+def add_problem_to_contest(contest_id, problem_id, problem_order=1, score=100):
+    """将题目加入比赛"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT OR IGNORE INTO contest_problems (contest_id, problem_id, problem_order, score) VALUES (?, ?, ?, ?)",
+        (contest_id, problem_id, problem_order, score)
+    )
+    conn.commit()
+    conn.close()
+
+
+def remove_problem_from_contest(contest_id, problem_id):
+    """从比赛中移除题目"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "DELETE FROM contest_problems WHERE contest_id = ? AND problem_id = ?",
+        (contest_id, problem_id)
+    )
+    conn.commit()
+    conn.close()
+
+
+def register_for_contest(contest_id, user_id):
+    """用户注册参赛"""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO contest_registrations (contest_id, user_id) VALUES (?, ?)",
+            (contest_id, user_id)
+        )
+        conn.commit()
+        conn.close()
+        return True, "注册成功"
+    except sqlite3.IntegrityError:
+        conn.close()
+        return False, "已注册过该比赛"
+
+
+def is_registered_for_contest(contest_id, user_id):
+    """检查用户是否已注册比赛"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT 1 FROM contest_registrations WHERE contest_id = ? AND user_id = ?",
+        (contest_id, user_id)
+    )
+    result = cursor.fetchone()
+    conn.close()
+    return result is not None
+
+
+def get_contest_standings(contest_id):
+    """
+    比赛计分板：统计每个参赛用户在该比赛题目上的得分情况。
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT
+            u.id, u.username, u.nickname,
+            COUNT(DISTINCT s.id) as total_submissions,
+            SUM(CASE WHEN s.status = 'AC' THEN cp.score ELSE 0 END) as total_score,
+            SUM(CASE WHEN s.status = 'AC' THEN 1 ELSE 0 END) as ac_count,
+            MAX(s.created_at) as last_submit_time
+        FROM contest_registrations cr
+        JOIN users u ON cr.user_id = u.id
+        JOIN contest_problems cp ON cr.contest_id = cp.contest_id
+        LEFT JOIN submissions s ON s.user_id = u.id AND s.problem_id = cp.problem_id
+            AND s.created_at >= (SELECT start_time FROM contests WHERE id = ?)
+            AND s.created_at <= (SELECT end_time FROM contests WHERE id = ?)
+        WHERE cr.contest_id = ?
+        GROUP BY u.id
+        ORDER BY total_score DESC, ac_count DESC, total_submissions ASC
+    """, (contest_id, contest_id, contest_id))
+    standings = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return standings
+
+
+def get_contest_problems(contest_id):
+    """获取比赛关联的题目 ID 列表"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT problem_id FROM contest_problems WHERE contest_id = ? ORDER BY problem_order",
+        (contest_id,)
+    )
+    ids = [row['problem_id'] for row in cursor.fetchall()]
+    conn.close()
+    return ids
 
 
 # Test_cases' command

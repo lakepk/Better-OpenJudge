@@ -12,7 +12,7 @@
   - **如何优化**：可用 Docker SDK 为每次评测启动临时容器（简单但慢），或用 nsjail/firejail 设置 chroot + seccomp + cgroup 限制（推荐，成熟 OJ 方案）。至少做到：禁止网络、限制内存和时间、限制子进程数、白名单允许的 syscall、只读挂载必要目录。
   - **主要责任人**：judge
 
-- [ ] **CSRF 防护**
+- [x] **CSRF 防护**
 
   - **现状**：[data/app.py](data/app.py) 所有 POST 路由（提交代码、删除题目、管理用户、删除公告等）无任何跨站请求伪造保护。攻击者只需让管理员访问一个恶意页面，就能在管理员不知情时触发删除题目、禁用用户等操作。
   - **如何优化**：引入 `flask-wtf` 为所有表单生成 CSRF token，或在 `@app.before_request` 中对 POST 请求校验自定义 CSRF header。模板中 `<form>` 加 `{{ csrf_token() }}`。
@@ -46,37 +46,37 @@
   - **如何优化**：每个列表查询函数加 `page` 和 `per_page` 参数，SQL 加 `LIMIT ? OFFSET ?`。模板中生成页码条（上一页/下一页/跳转）。Flask 请求中读取 `request.args.get('page', 1)`。
   - **主要责任人**：data（database.py + app.py + 模板）
 
-- [ ] **搜索与筛选**
+- [x] **搜索与筛选**
 
   - **现状**：[data/app.py](data/app.py) 题目列表页无任何搜索框或过滤控件，所有题目平铺直叙。用户无法按标题关键词搜索，无法按难度/标签/是否已 AC 筛选。
   - **如何优化**：题目列表页顶部加搜索栏 + 筛选下拉。SQL 加 `WHERE title LIKE ?` 和难度/tag 过滤条件。标签筛选需 JOIN `problem_tags` 和 `tags` 表。
   - **主要责任人**：data（app.py + database.py + 模板）
 
-- [ ] **排行榜**
+- [x] **排行榜**
 
   - **现状**：无任何排名页面。用户无法看到谁解题最多、谁排名靠前。
   - **如何优化**：数据库统计每个用户的 AC 数、提交数、通过率，新建 `/ranking` 路由展示。SQL 示例：`SELECT u.nickname, COUNT(DISTINCT s.problem_id) as ac_count FROM users u JOIN submissions s ON u.id=s.user_id WHERE s.status='AC' GROUP BY u.id ORDER BY ac_count DESC`。
   - **主要责任人**：data（app.py + database.py + 模板）
 
-- [ ] **Rejudge（重判）**
+- [x] **Rejudge（重判）**
 
   - **现状**：修改题目测试用例后，该题所有的历史提交结果仍然是旧测试用例判的，无法批量重新评测。
   - **如何优化**：管理员界面加"重判"按钮。调用 `bridge.judge_async()` 重新评测该题所有提交（或指定单个提交）。需新增 `/admin/rejudge/<problem_id>` 或 `/admin/rejudge_submission/<id>` 路由。
   - **主要责任人**：data（app.py 路由 + 模板按钮）+ web（bridge 复用 judge_async）
 
-- [ ] **Special Judge（SPJ）**
+- [x] **Special Judge（SPJ）**
 
   - **现状**：[judge/core/checker.py](judge/core/checker.py) 仅支持 `diff` 严格文本比对。浮点数输出、多解问题、任意顺序输出等场景无法判定。
   - **如何优化**：允许管理员为题目上传/指定一个 SPJ 脚本（Python），checker 判断是否使用 SPJ → 编译并执行 SPJ 脚本 → SPJ 脚本接收输入文件、用户输出、标准答案，返回 AC/WA。
   - **主要责任人**：judge（checker.py + controller.py）+ data（题目编辑页加 SPJ 上传）
 
-- [ ] **提交实时反馈**
+- [x] **提交实时反馈**
 
   - **现状**：[data/templates/submission_detail.html](data/templates/submission_detail.html) 提交后是静态页面，状态为 "Pending" 时用户只能手动刷新浏览器。
   - **如何优化**：前端用 JavaScript 每隔 2 秒 AJAX 轮询 `/api/submission/<id>/status` 返回 `{"status": "Pending|Judging|AC|WA|..."}`。status 变化时自动刷新整个页面或更新卡片。以后可升级为 WebSocket。
   - **主要责任人**：data（API 端点 + 模板 JS）
 
-- [ ] **比赛系统**
+- [x] **比赛系统**
 
   - **现状**：完全缺失。无法创建限时比赛、无法设置比赛专用题目集、无实时计分板。
   - **如何优化**：新增 `contests` 表（起止时间、标题、描述）、`contest_problems` 关联表（比赛→题目映射，可设不同分值）、`contest_registrations`（参赛登记）。新增 `/contests`、`/contest/<id>` 路由。比赛期间排行榜实时更新。**注：这是大功能，建议 P0-P1 其他项完成后再启动。**
@@ -86,43 +86,43 @@
 
 ## 🟡 P2 — 体验与质量
 
-- [ ] **代码编辑器（Monaco/CodeMirror）**
+- [x] **代码编辑器（Monaco/CodeMirror）**
 
   - **现状**：[data/templates/submit.html](data/templates/submit.html) 第 24 行是纯 `<textarea>`，无行号、无语法高亮、无自动缩进、Tab 键不能正常输入。用户体验差且容易拼写错误。
   - **如何优化**：引入 CodeMirror 6（轻量）或 Monaco Editor（VS Code 内核，较重）。CDN 加载 JS/CSS，一行 JS 初始化即可。根据选择的语言切换高亮模式（C++/Python）。
   - **主要责任人**：data（submit.html 模板）
 
-- [ ] **代码语法高亮显示**
+- [x] **代码语法高亮显示**
 
   - **现状**：[data/templates/submission_detail.html](data/templates/submission_detail.html) 第 27 行代码放在 `<pre>` 标签里，纯单色文本，无语言相关的关键字着色。
   - **如何优化**：引入 highlight.js 或 Prism.js（CDN），对 `<pre><code>` 中的代码按 `submission.language` 自动着色。
   - **主要责任人**：data（submission_detail.html 模板）
 
-- [ ] **Markdown 渲染**
+- [x] **Markdown 渲染**
 
   - **现状**：[data/templates/problem_detail.html](data/templates/problem_detail.html) 第 37-72 行用 `{{ problem.description | safe }}` 等直接输出 HTML。管理页面提示"支持 Markdown"但实际上不渲染。同时 `| safe` 带来了 XSS 风险。
   - **如何优化**：引入 Python `markdown` 库（在 requirements.txt 中），将题目内容先 `markdown.markdown(text, extensions=['fenced_code', 'tables', 'codehilite'])` 渲染为 HTML，再通过 `| safe` 输出。Markdown 库本身会转义内嵌的 HTML，消除 XSS 风险。
   - **主要责任人**：data（app.py 渲染逻辑）+ web（requirements.txt）
 
-- [ ] **已解决标记**
+- [x] **已解决标记**
 
   - **现状**：题目列表不显示用户是否已 AC — 这是几乎所有 OJ 的标准体验（绿色勾、红色叉）。
   - **如何优化**：在 `get_all_problems` 中 JOIN 用户提交记录，返回每个题目对应当前用户的 `best_status`（AC/WA/None）。模板中用绿色勾 ✓ 或红色叉 ✗ 标识。
   - **主要责任人**：data（database.py + 模板）
 
-- [ ] **响应式布局**
+- [x] **响应式布局**
 
   - **现状**：[data/templates/base.html](data/templates/base.html) 第 41 行 `.container { max-width: 900px; }` 固定宽度。手机访问需要水平滚动，基本不可用。
   - **如何优化**：引入 Bootstrap 5 或 Tailwind CSS（CDN），替换手写 CSS。至少改用 `max-width: 900px; width: 95%;` 加 `@media` 断点适配小屏。导航栏在小屏上改为汉堡菜单。
   - **主要责任人**：data（base.html + 各模板）
 
-- [ ] **REST API**
+- [x] **REST API**
 
   - **现状**：全部是 HTML 模板渲染，无 JSON API。无法开发 CLI 提交工具、VS Code 插件、手机 App。
   - **如何优化**：新增 `/api/v1/` 蓝图，提供 `GET /api/v1/problems`、`POST /api/v1/submit`、`GET /api/v1/submission/<id>` 等端点。返回 JSON，用 token 认证（新增 `api_tokens` 表）。
   - **主要责任人**：data（新蓝图 + 路由）
 
-- [ ] **XSS 修复**
+- [x] **XSS 修复**
 
   - **现状**：[data/templates/problem_detail.html](data/templates/problem_detail.html) 中 `{{ problem.description | safe }}` 等直接渲染为 HTML。如果题目内容包含 `<script>alert(1)</script>`，会在所有查看该题的用户浏览器中执行。
   - **如何优化**：与 Markdown 渲染合并处理 — `markdown` 库转义原始 HTML 标签，只允许安全的 Markdown 语法生成的 HTML 通过。移除裸 `| safe`，改为 `{{ rendered_description | safe }}`（rendered 变量由 Python 端 markdown 库生成）。
@@ -156,7 +156,7 @@
   - **如何优化**：运行 `pip freeze > requirements.lock` 锁定所有包的确切版本。`requirements.txt` 保留宽松约束，`requirements.lock` 用于生产构建。Dockerfile 中用 `requirements.lock` 安装。
   - **主要责任人**：web
 
-- [ ] **数据库迁移**
+- [x] **数据库迁移**
 
   - **现状**：[data/database.py](data/database.py) 用 `CREATE TABLE IF NOT EXISTS` 管理 schema。添加新列或索引只能手动执行 SQL，没有版本追踪，不知道当前数据库处于哪个 schema 版本。
   - **如何优化**：引入 Alembic（Flask-Migrate），`alembic init` → 生成初始 migration → 以后每次改 schema 用 `alembic revision --autogenerate && alembic upgrade head`。迁移文件可提交 git 供队友同步。

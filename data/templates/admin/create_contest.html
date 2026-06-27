@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}{% if contest %}编辑比赛{% else %}创建比赛{% endif %} - LiteJudge{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>{% if contest %}编辑比赛: {{ contest.title }}{% else %}创建比赛{% endif %}</h2>
+
+    {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+    <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group">
+            <label>比赛标题 *</label>
+            <input type="text" name="title" value="{{ contest.title if contest else '' }}" required>
+        </div>
+        <div class="form-group">
+            <label>比赛描述 <span class="text-muted">（支持 Markdown）</span></label>
+            <textarea name="description" rows="4">{{ contest.description if contest else '' }}</textarea>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+                <label>开始时间 *</label>
+                <input type="datetime-local" name="start_time" value="{{ contest.start_time[:16] if contest else '' }}" required>
+            </div>
+            <div class="form-group">
+                <label>结束时间 *</label>
+                <input type="datetime-local" name="end_time" value="{{ contest.end_time[:16] if contest else '' }}" required>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>是否公开</label>
+            <select name="is_visible">
+                <option value="1" {% if not contest or contest.is_visible %}selected{% endif %}>公开</option>
+                <option value="0" {% if contest and not contest.is_visible %}selected{% endif %}>隐藏</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>比赛题目 <span class="text-muted">（Ctrl+Click 多选）</span></label>
+            <select name="problem_ids" multiple style="height: 200px; font-size: 13px;">
+                {% for p in all_problems %}
+                    <option value="{{ p.id }}"
+                        {% if existing_problem_ids and p.id in existing_problem_ids %}selected{% endif %}
+                        {% if contest %}
+                            {% for cp in contest.problems %}
+                                {% if cp.id == p.id %}selected{% endif %}
+                            {% endfor %}
+                        {% endif %}>
+                        #{{ p.id }} {{ p.title }}
+                        {% if p.difficulty == 1 %}[简单]{% elif p.difficulty == 2 %}[中等]{% else %}[困难]{% endif %}
+                        {% if not p.is_visible %}[隐藏]{% endif %}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">
+            {% if contest %}保存修改{% else %}创建比赛{% endif %}
+        </button>
+        <a href="/admin/contests" class="btn btn-secondary">取消</a>
+    </form>
+</div>
+{% endblock %}

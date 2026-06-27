@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}比赛管理 - LiteJudge{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="flex-between mb-20">
+        <h2>比赛管理</h2>
+        <a href="/admin/create_contest" class="btn btn-primary">创建比赛</a>
+    </div>
+
+    {% if contests %}
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>标题</th>
+                <th>开始时间</th>
+                <th>结束时间</th>
+                <th>可见</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in contests %}
+            <tr>
+                <td>{{ c.id }}</td>
+                <td><a href="/contest/{{ c.id }}">{{ c.title }}</a></td>
+                <td class="text-muted">{{ c.start_time[:16] | replace('T', ' ') }}</td>
+                <td class="text-muted">{{ c.end_time[:16] | replace('T', ' ') }}</td>
+                <td>{{ '是' if c.is_visible else '否' }}</td>
+                <td>
+                    <a href="/admin/edit_contest/{{ c.id }}" class="btn btn-secondary btn-sm">编辑</a>
+                    <form method="post" action="/admin/delete_contest/{{ c.id }}" style="display:inline;" onsubmit="confirmDelete(this); return false;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger btn-sm">删除</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted text-center" style="padding: 40px;">暂无比赛，点击上方按钮创建</p>
+    {% endif %}
+</div>
+
+{% from "base.html" import pagination with context %}
+{{ pagination(page, total_pages, total) }}
+
+{% endblock %}

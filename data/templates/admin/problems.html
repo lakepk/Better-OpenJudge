@@ -34,6 +34,10 @@
                 <td>
                     <a href="/admin/edit_problem/{{ p.id }}" class="btn btn-secondary btn-sm">编辑</a>
                     <a href="/admin/problem/{{ p.id }}/test_cases" class="btn btn-secondary btn-sm">测试数据</a>
+                    <form method="post" action="/admin/rejudge_problem/{{ p.id }}" style="display:inline;" onsubmit="confirm('确定要重判该题所有提交吗？')||event.preventDefault()">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-secondary btn-sm" style="background:#f0ad4e; color:white;">重判</button>
+                    </form>
                     <form method="post" action="/admin/delete_problem/{{ p.id }}" style="display:inline;" onsubmit="confirmDelete(this); return false;">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-danger btn-sm">删除</button>

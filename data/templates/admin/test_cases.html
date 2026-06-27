@@ -4,7 +4,13 @@
 <div class="card">
     <div class="flex-between mb-20">
         <h2>测试数据: {{ problem.title }}</h2>
-        <a href="/admin/problem/{{ problem.id }}/add_test_case" class="btn btn-primary">添加测试点</a>
+        <div style="display:flex; gap:8px;">
+            <a href="/admin/problem/{{ problem.id }}/add_test_case" class="btn btn-primary">添加测试点</a>
+            <form method="post" action="/admin/rejudge_problem/{{ problem.id }}" style="display:inline;" onsubmit="confirm('确定要重判该题所有提交吗？修改测试用例后应重判以确保结果正确。')||event.preventDefault()">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-secondary btn-sm" style="background:#f0ad4e; color:white;">重判全部提交</button>
+            </form>
+        </div>
     </div>
 
     {% if test_cases %}

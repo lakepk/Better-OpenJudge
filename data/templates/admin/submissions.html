@@ -15,6 +15,7 @@
                 <th>语言</th>
                 <th>时间</th>
                 <th>提交时间</th>
+                <th>操作</th>
             </tr>
         </thead>
         <tbody>
@@ -27,6 +28,12 @@
                 <td>{{ s.language }}</td>
                 <td>{{ s.time_used }}ms</td>
                 <td class="text-muted">{{ s.created_at }}</td>
+                <td>
+                    <form method="post" action="/admin/rejudge_submission/{{ s.id }}" style="display:inline;" onsubmit="confirm('确定要重判该提交吗？')||event.preventDefault()">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-secondary btn-sm" style="background:#f0ad4e; color:white;">重判</button>
+                    </form>
+                </td>
             </tr>
             {% endfor %}
         </tbody>

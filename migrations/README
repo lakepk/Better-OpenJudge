@@ -1,0 +1,44 @@
+数据库迁移指南
+===============
+
+本项目使用 Alembic 管理数据库 schema 版本。
+
+## 使用方式
+
+### 新建迁移（修改 schema 时）
+```bash
+# 在项目根目录执行
+alembic revision -m "描述你的变更"
+
+# 编辑生成的 migrations/versions/xxxx_xxx.py
+# 在 upgrade() 中写 CREATE TABLE / ALTER TABLE 等
+# 在 downgrade() 中写对应的回滚操作
+```
+
+### 应用迁移
+```bash
+alembic upgrade head
+```
+
+### 回滚迁移
+```bash
+alembic downgrade -1     # 回滚一个版本
+alembic downgrade base   # 回滚所有
+```
+
+### 查看当前版本
+```bash
+alembic current
+```
+
+### 查看迁移历史
+```bash
+alembic history
+```
+
+## 注意事项
+
+- 本项目使用 raw SQL（非 SQLAlchemy ORM），迁移用 `op.execute("SQL")` 编写
+- `init_db()` 中的 `CREATE TABLE IF NOT EXISTS` 可保留作为新部署的初始化和 fallback
+- 新增列时建议同时更新 `init_db()` 中的 `CREATE TABLE` 定义（保持一致性）
+- 生产环境部署前先 `alembic upgrade head`

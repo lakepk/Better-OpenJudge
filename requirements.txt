@@ -4,3 +4,4 @@ werkzeug
 flask-wtf
 markdown>=3.7
 Pygments>=2.18
+flask-migrate>=4.0

@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}{{ contest.title }} - 比赛 - LiteJudge{% endblock %}
+{% block content %}
+
+<div class="card">
+    <h2>🏅 {{ contest.title }}</h2>
+    {% if not contest.is_visible %}
+        <span class="text-muted">[隐藏]</span>
+    {% endif %}
+
+    <p class="text-muted mb-20">
+        ⏰ {{ contest.start_time[:16] | replace('T', ' ') }} ~ {{ contest.end_time[:16] | replace('T', ' ') }}
+        &nbsp;|&nbsp; 👥 {{ contest.registrations_count }} 人参赛
+        {% if now < contest.start_time %}
+            &nbsp;|&nbsp; <span class="status status-Pending">未开始</span>
+        {% elif now > contest.end_time %}
+            &nbsp;|&nbsp; <span class="status status-RE">已结束</span>
+        {% else %}
+            &nbsp;|&nbsp; <span class="status status-AC">进行中</span>
+        {% endif %}
+    </p>
+
+    {% if contest.description %}
+        <div class="content-area mb-20">{{ contest.description }}</div>
+    {% endif %}
+
+    {% if user and user.user_id %}
+        {% if is_registered %}
+            <span class="btn btn-secondary btn-sm" style="cursor:default;">✓ 已报名</span>
+        {% elif now < contest.end_time %}
+            <form method="post" action="/contest/{{ contest.id }}/register" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-primary btn-sm">报名参赛</button>
+            </form>
+        {% endif %}
+    {% endif %}
+
+    {% if user and user.role == 'admin' %}
+        <a href="/admin/edit_contest/{{ contest.id }}" class="btn btn-secondary btn-sm">编辑比赛</a>
+    {% endif %}
+</div>
+
+{% if contest.problems %}
+<div class="card">
+    <h3>📋 比赛题目</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>标题</th>
+                <th>难度</th>
+                <th>分值</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in contest.problems %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>
+                    <a href="/problem/{{ p.id }}">{{ p.title }}</a>
+                    {% if now >= contest.start_time or user.role == 'admin' %}
+                        &nbsp;<a href="/problem/{{ p.id }}/submit" class="btn btn-primary btn-sm">提交</a>
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="difficulty
+                        {% if p.difficulty == 1 %}difficulty-easy
+                        {% elif p.difficulty == 2 %}difficulty-medium
+                        {% else %}difficulty-hard{% endif %}">
+                        {{ '★' * p.difficulty }}{{ '☆' * (3 - p.difficulty) }}
+                    </span>
+                </td>
+                <td><strong>{{ p.contest_score }}</strong></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if standings %}
+<div class="card">
+    <h3>🏆 计分板</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>排名</th>
+                <th>用户</th>
+                <th>总分</th>
+                <th>AC 题数</th>
+                <th>总提交</th>
+                <th>最后提交</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in standings %}
+            <tr>
+                <td>
+                    {% set rank = loop.index %}
+                    {% if rank == 1 %}🥇
+                    {% elif rank == 2 %}🥈
+                    {% elif rank == 3 %}🥉
+                    {% else %}{{ rank }}{% endif %}
+                </td>
+                <td>{{ s.nickname or s.username }}</td>
+                <td><strong>{{ s.total_score }}</strong></td>
+                <td>{{ s.ac_count }}</td>
+                <td>{{ s.total_submissions }}</td>
+                <td class="text-muted">{{ s.last_submit_time }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<a href="/contests" class="btn btn-secondary mt-20">返回比赛列表</a>
+
+{% endblock %}

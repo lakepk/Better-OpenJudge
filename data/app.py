@@ -191,6 +191,154 @@ def ranking():
                            page=page, total_pages=total_pages, total=total)
 
 
+# ==================== 比赛系统 ====================
+@app.route('/contests')
+def contest_list():
+    page = request.args.get('page', 1, type=int)
+    is_admin = session.get('role') == 'admin'
+    contests, total = get_all_contests(include_hidden=is_admin, page=page)
+    total_pages = max(1, (total + 19) // 20)
+
+    import datetime
+    now = datetime.datetime.now().isoformat()
+
+    return render_template('contests.html',
+                           user=session,
+                           contests=contests,
+                           now=now,
+                           page=page, total_pages=total_pages, total=total)
+
+
+@app.route('/contest/<int:contest_id>')
+def contest_detail(contest_id):
+    contest = get_contest_by_id(contest_id)
+    if not contest:
+        return render_template('error.html',
+                               message='比赛不存在', user=session), 404
+
+    if not contest['is_visible'] and session.get('role') != 'admin':
+        return render_template('error.html',
+                               message='比赛不存在', user=session), 404
+
+    standings = get_contest_standings(contest_id)
+    is_registered = False
+    if session.get('user_id'):
+        is_registered = is_registered_for_contest(contest_id, session['user_id'])
+
+    import datetime
+    now = datetime.datetime.now().isoformat()
+
+    return render_template('contest_detail.html',
+                           user=session,
+                           contest=contest,
+                           standings=standings,
+                           is_registered=is_registered,
+                           now=now)
+
+
+@app.route('/contest/<int:contest_id>/register', methods=['POST'])
+@login_required
+def contest_register(contest_id):
+    success, msg = register_for_contest(contest_id, session['user_id'])
+    return redirect(url_for('contest_detail', contest_id=contest_id))
+
+
+# ==================== 管理员 - 比赛管理 ====================
+@app.route('/admin/contests')
+@login_required
+@admin_required
+def admin_contest_list():
+    page = request.args.get('page', 1, type=int)
+    contests, total = get_all_contests(include_hidden=True, page=page)
+    total_pages = max(1, (total + 19) // 20)
+    return render_template('admin/contests.html',
+                           user=session,
+                           contests=contests,
+                           page=page, total_pages=total_pages, total=total)
+
+
+@app.route('/admin/create_contest', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def admin_create_contest():
+    all_problems, _ = get_all_problems(is_admin=True, page=1, per_page=1000)
+
+    if request.method == 'POST':
+        title = request.form.get('title', '').strip()
+        description = request.form.get('description', '')
+        start_time = request.form.get('start_time', '')
+        end_time = request.form.get('end_time', '')
+        is_visible = int(request.form.get('is_visible', 1))
+
+        if not title or not start_time or not end_time:
+            return render_template('admin/create_contest.html',
+                                   error='标题、开始时间和结束时间为必填项',
+                                   user=session,
+                                   all_problems=all_problems)
+
+        contest_id = create_contest(title, description, start_time, end_time,
+                                     session['user_id'], is_visible)
+
+        # 添加题目
+        problem_ids = request.form.getlist('problem_ids')
+        for pid in problem_ids:
+            if pid.strip():
+                add_problem_to_contest(contest_id, int(pid))
+
+        return redirect(url_for('contest_detail', contest_id=contest_id))
+
+    return render_template('admin/create_contest.html',
+                           user=session,
+                           all_problems=all_problems)
+
+
+@app.route('/admin/edit_contest/<int:contest_id>', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def admin_edit_contest(contest_id):
+    contest = get_contest_by_id(contest_id)
+    if not contest:
+        return render_template('error.html',
+                               message='比赛不存在', user=session), 404
+
+    all_problems, _ = get_all_problems(is_admin=True, page=1, per_page=1000)
+    existing_problem_ids = {p['id'] for p in contest['problems']}
+
+    if request.method == 'POST':
+        update_data = {
+            'title': request.form.get('title', '').strip(),
+            'description': request.form.get('description', ''),
+            'start_time': request.form.get('start_time', ''),
+            'end_time': request.form.get('end_time', ''),
+            'is_visible': int(request.form.get('is_visible', 1)),
+        }
+        update_contest(contest_id, **update_data)
+
+        # 更新题目：先全部移除，再重新添加
+        for p in contest['problems']:
+            remove_problem_from_contest(contest_id, p['id'])
+        problem_ids = request.form.getlist('problem_ids')
+        for pid in problem_ids:
+            if pid.strip():
+                add_problem_to_contest(contest_id, int(pid))
+
+        return redirect(url_for('contest_detail', contest_id=contest_id))
+
+    return render_template('admin/create_contest.html',
+                           user=session,
+                           contest=contest,
+                           all_problems=all_problems,
+                           existing_problem_ids=existing_problem_ids)
+
+
+@app.route('/admin/delete_contest/<int:contest_id>', methods=['POST'])
+@login_required
+@admin_required
+def admin_delete_contest(contest_id):
+    delete_contest(contest_id)
+    return redirect(url_for('admin_contest_list'))
+
+
 # ==================== 用户个人中心 ====================
 @app.route('/profile')
 @login_required
@@ -350,6 +498,24 @@ def submission_detail(submission_id):
                            user=session)
 
 
+@app.route('/api/submission/<int:submission_id>/status')
+@login_required
+def api_submission_status(submission_id):
+    """JSON API：返回提交的当前状态，供前端 AJAX 轮询"""
+    submission = get_submission_detail(submission_id)
+    if not submission:
+        return {"error": "提交记录不存在"}, 404
+    if submission['user_id'] != session['user_id'] and session.get('role') != 'admin':
+        return {"error": "无权查看此提交"}, 403
+    return {
+        "id": submission['id'],
+        "status": submission['status'],
+        "score": submission['score'],
+        "time_used": submission['time_used'],
+        "memory_used": submission['memory_used'],
+    }
+
+
 # ==================== 管理员 - 题目管理 ====================
 @app.route('/admin/problems')
 @login_required
@@ -381,6 +547,8 @@ def admin_create_problem():
         time_limit = int(request.form.get('time_limit', 1000))
         memory_limit = int(request.form.get('memory_limit', 65536))
         tags_str = request.form.get('tags', '')
+        use_spj = int(request.form.get('use_spj', 0))
+        spj_script = request.form.get('spj_script', '')
 
         if not title:
             return render_template('admin/create_problem.html',
@@ -397,7 +565,9 @@ def admin_create_problem():
                                     source=source,
                                     difficulty=difficulty,
                                     time_limit=time_limit,
-                                    memory_limit=memory_limit)
+                                    memory_limit=memory_limit,
+                                    use_spj=use_spj,
+                                    spj_script=spj_script)
 
         # 处理标签
         if tags_str:
@@ -433,7 +603,9 @@ def admin_edit_problem(problem_id):
             'difficulty': int(request.form.get('difficulty', 1)),
             'time_limit': int(request.form.get('time_limit', 1000)),
             'memory_limit': int(request.form.get('memory_limit', 65536)),
-            'is_visible': int(request.form.get('is_visible', 1))
+            'is_visible': int(request.form.get('is_visible', 1)),
+            'use_spj': int(request.form.get('use_spj', 0)),
+            'spj_script': request.form.get('spj_script', '')
         }
 
         update_problem(problem_id, **update_data)
@@ -463,6 +635,67 @@ def admin_edit_problem(problem_id):
 def admin_delete_problem(problem_id):
     delete_problem(problem_id)
     return redirect(url_for('admin_problem_list'))
+
+
+@app.route('/admin/rejudge_problem/<int:problem_id>', methods=['POST'])
+@login_required
+@admin_required
+def admin_rejudge_problem(problem_id):
+    """重判某个题目的所有历史提交"""
+    problem = get_problem_by_id(problem_id)
+    if not problem:
+        return render_template('error.html',
+                               message='题目不存在',
+                               user=session), 404
+
+    submission_ids = get_submission_ids_by_problem(problem_id)
+    if not submission_ids:
+        return redirect(url_for('admin_problem_list'))
+
+    # 重置所有提交为 Pending
+    for sid in submission_ids:
+        reset_submission_for_rejudge(sid)
+
+    # 更新题目统计
+    update_problem_stats(problem_id)
+
+    # 尝试调用评测机异步重判
+    try:
+        import sys
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'web'))
+        from bridge import judge_async
+        for sid in submission_ids:
+            judge_async(sid)
+        flash_msg = f"已重置 {len(submission_ids)} 条提交并触发重判"
+    except ImportError:
+        flash_msg = f"已重置 {len(submission_ids)} 条提交为 Pending（评测机未连接，将自动重判）"
+
+    return redirect(url_for('admin_problem_list'))
+
+
+@app.route('/admin/rejudge_submission/<int:submission_id>', methods=['POST'])
+@login_required
+@admin_required
+def admin_rejudge_submission(submission_id):
+    """重判单个提交"""
+    sub = get_submission_detail(submission_id)
+    if not sub:
+        return render_template('error.html',
+                               message='提交记录不存在',
+                               user=session), 404
+
+    reset_submission_for_rejudge(submission_id)
+    update_problem_stats(sub['problem_id'])
+
+    try:
+        import sys
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'web'))
+        from bridge import judge_async
+        judge_async(submission_id)
+    except ImportError:
+        pass
+
+    return redirect(url_for('admin_submission_list'))
 
 
 # ==================== 管理员 - 测试数据管理 ====================
@@ -590,6 +823,132 @@ def admin_create_announcement():
 def admin_delete_announcement(announcement_id):
     delete_announcement(announcement_id)
     return redirect(url_for('admin_announcement_list'))
+
+
+# ==================== API v1 ====================
+from flask import Blueprint, jsonify
+
+api_bp = Blueprint('api_v1', __name__, url_prefix='/api/v1')
+
+
+def api_login_required(f):
+    """API token 认证装饰器"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.headers.get('Authorization', '')
+        if not auth.startswith('Bearer '):
+            return jsonify({"error": "缺少 Authorization: Bearer <token> 头"}), 401
+        token = auth[7:]
+        user = get_user_by_token(token)
+        if not user:
+            return jsonify({"error": "无效的 API Token"}), 401
+        request.api_user = user
+        return f(*args, **kwargs)
+    return decorated
+
+
+@api_bp.route('/problems')
+def api_problems():
+    """GET /api/v1/problems?page=1&search=&difficulty=&tag="""
+    page = request.args.get('page', 1, type=int)
+    search = request.args.get('search', '').strip()
+    difficulty = request.args.get('difficulty', None, type=int)
+    tag = request.args.get('tag', '').strip() or None
+
+    problems, total = get_all_problems(is_admin=False, page=page,
+                                        search=search, difficulty=difficulty, tag=tag)
+    total_pages = max(1, (total + 19) // 20)
+
+    return jsonify({
+        "page": page,
+        "per_page": 20,
+        "total": total,
+        "total_pages": total_pages,
+        "problems": problems,
+    })
+
+
+@api_bp.route('/problem/<int:problem_id>')
+def api_problem_detail(problem_id):
+    """GET /api/v1/problem/<id>"""
+    problem = get_problem_by_id(problem_id)
+    if not problem or not problem['is_visible']:
+        return jsonify({"error": "题目不存在"}), 404
+    # 不返回敏感管理字段
+    return jsonify({
+        "id": problem['id'],
+        "title": problem['title'],
+        "description": problem['description'],
+        "input_format": problem['input_format'],
+        "output_format": problem['output_format'],
+        "sample_input": problem['sample_input'],
+        "sample_output": problem['sample_output'],
+        "hint": problem['hint'],
+        "source": problem['source'],
+        "difficulty": problem['difficulty'],
+        "time_limit": problem['time_limit'],
+        "memory_limit": problem['memory_limit'],
+        "tags": problem.get('tags', []),
+        "accepted_count": problem['accepted_count'],
+        "submission_count": problem['submission_count'],
+    })
+
+
+@api_bp.route('/submit', methods=['POST'])
+@api_login_required
+def api_submit():
+    """POST /api/v1/submit  — JSON body: {problem_id, code, language}"""
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "请求体需为 JSON"}), 400
+
+    problem_id = data.get('problem_id')
+    code = data.get('code', '')
+    language = data.get('language', 'cpp')
+
+    if not problem_id or not code.strip():
+        return jsonify({"error": "problem_id 和 code 不能为空"}), 400
+
+    problem = get_problem_by_id(int(problem_id))
+    if not problem or not problem['is_visible']:
+        return jsonify({"error": "题目不存在"}), 404
+
+    submission_id = create_submission(request.api_user['id'],
+                                       int(problem_id),
+                                       code,
+                                       language)
+    # TODO: 对接评测机 judge_submission(submission_id)
+
+    return jsonify({
+        "submission_id": submission_id,
+        "status": "Pending",
+    }), 201
+
+
+@api_bp.route('/submission/<int:submission_id>')
+@api_login_required
+def api_submission(submission_id):
+    """GET /api/v1/submission/<id>"""
+    sub = get_submission_detail(submission_id)
+    if not sub:
+        return jsonify({"error": "提交记录不存在"}), 404
+    if sub['user_id'] != request.api_user['id'] and request.api_user['role'] != 'admin':
+        return jsonify({"error": "无权查看此提交"}), 403
+    return jsonify({
+        "id": sub['id'],
+        "problem_id": sub['problem_id'],
+        "problem_title": sub['problem_title'],
+        "status": sub['status'],
+        "score": sub['score'],
+        "time_used": sub['time_used'],
+        "memory_used": sub['memory_used'],
+        "language": sub['language'],
+        "compiler_output": sub['compiler_output'],
+        "created_at": sub['created_at'],
+    })
+
+
+app.register_blueprint(api_bp)
 
 
 # ==================== 启动应用 ====================
