@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}LiteJudge{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/pygments/pygments@2.18.0/pygments/default.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -138,6 +139,17 @@
         .content-area code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
         .content-area table { margin: 12px 0; }
         .content-area th, .content-area td { border: 1px solid #ddd; padding: 8px; }
+        .content-area .highlight { background: #f8f8f8; border-radius: 6px; padding: 12px; overflow-x: auto; margin: 12px 0; }
+        .content-area .highlight pre { margin: 0; background: transparent; padding: 0; }
+
+        /* 分页 */
+        .pagination { display: flex; justify-content: center; align-items: center; gap: 6px; margin-top: 20px; flex-wrap: wrap; }
+        .pagination a, .pagination span { display: inline-block; padding: 6px 12px; border-radius: 4px; font-size: 13px; text-decoration: none; }
+        .pagination a { background: white; color: #333; border: 1px solid #ddd; }
+        .pagination a:hover { background: #e94560; color: white; border-color: #e94560; }
+        .pagination .current { background: #e94560; color: white; font-weight: bold; }
+        .pagination .disabled { color: #aaa; background: #f5f5f5; border: 1px solid #eee; cursor: not-allowed; }
+        .pagination .info { color: #888; font-size: 12px; margin: 0 8px; }
 
         a { color: #e94560; }
     </style>
@@ -171,6 +183,43 @@
     <div class="container">
         {% block content %}{% endblock %}
     </div>
+
+    {% macro pagination(page, total_pages, total) %}
+    {% if total_pages > 1 %}
+    <div class="pagination">
+        {% if page > 1 %}
+            <a href="?page=1">首页</a>
+            <a href="?page={{ page - 1 }}">上一页</a>
+        {% else %}
+            <span class="disabled">首页</span>
+            <span class="disabled">上一页</span>
+        {% endif %}
+
+        {% set ns = namespace(start=1, end=total_pages) %}
+        {% if page > 3 %}{% set ns.start = page - 2 %}{% endif %}
+        {% if page + 2 < total_pages %}{% set ns.end = page + 2 %}{% endif %}
+        {% if ns.start > 1 %}<span>…</span>{% endif %}
+        {% for p in range(ns.start, ns.end + 1) %}
+            {% if p == page %}
+                <span class="current">{{ p }}</span>
+            {% else %}
+                <a href="?page={{ p }}">{{ p }}</a>
+            {% endif %}
+        {% endfor %}
+        {% if ns.end < total_pages %}<span>…</span>{% endif %}
+
+        {% if page < total_pages %}
+            <a href="?page={{ page + 1 }}">下一页</a>
+            <a href="?page={{ total_pages }}">末页</a>
+        {% else %}
+            <span class="disabled">下一页</span>
+            <span class="disabled">末页</span>
+        {% endif %}
+
+        <span class="info">共 {{ total }} 条</span>
+    </div>
+    {% endif %}
+    {% endmacro %}
 
     <script>
         // 确认删除的通用脚本

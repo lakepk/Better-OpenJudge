@@ -40,7 +40,7 @@
   - **如何优化**：实现 JobQueue 模型：提交进入队列 → worker 领取 → 评测 → 写入结果。支持查询队列位置、预估等待时间。崩溃的提交设置超时自动标记为 SE。
   - **主要责任人**：web（bridge.py），data（需新增队列状态字段到 submissions 表）
 
-- [ ] **分页**
+- [x] **分页**
 
   - **现状**：[data/database.py](data/database.py) 中 `get_all_problems`、`get_all_users`、`get_submissions_by_problem` 等函数全量查询无 LIMIT/OFFSET。数据超 100 条后页面加载巨慢。`get_submissions_by_user` 硬编码 `limit=50` 也不够。模板中无页码导航。
   - **如何优化**：每个列表查询函数加 `page` 和 `per_page` 参数，SQL 加 `LIMIT ? OFFSET ?`。模板中生成页码条（上一页/下一页/跳转）。Flask 请求中读取 `request.args.get('page', 1)`。

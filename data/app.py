@@ -4,6 +4,7 @@ from flask import Flask, render_template, request, redirect, url_for, session
 from functools import wraps
 from database import *
 from flask_wtf.csrf import CSRFProtect
+import markdown
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-use-env-var-in-production')
@@ -11,6 +12,27 @@ csrf = CSRFProtect(app)
 
 # 启动时初始化数据库
 init_db()
+
+
+def render_markdown(text):
+    """将 Markdown 文本安全渲染为 HTML，消除 XSS 风险"""
+    if not text:
+        return ''
+    return markdown.markdown(
+        text,
+        extensions=[
+            'fenced_code',
+            'tables',
+            'codehilite',
+            'nl2br',
+        ],
+        extension_configs={
+            'codehilite': {
+                'css_class': 'highlight',
+                'guess_lang': False,
+            }
+        }
+    )
 
 
 # ==================== 权限装饰器 ====================
@@ -38,11 +60,14 @@ def admin_required(f):
 @app.route('/')
 def index():
     announcements = get_announcements()
-    problems = get_all_problems(is_admin=(session.get('role') == 'admin'))
+    page = request.args.get('page', 1, type=int)
+    problems, total = get_all_problems(is_admin=(session.get('role') == 'admin'), page=page)
+    total_pages = max(1, (total + 19) // 20)
     return render_template('index.html',
                            user=session,
                            problems=problems,
-                           announcements=announcements)
+                           announcements=announcements,
+                           page=page, total_pages=total_pages, total=total)
 
 @app.route('/health')
 def health_check():
@@ -137,11 +162,14 @@ def logout():
 @login_required
 def profile():
     user = get_user_by_id(session['user_id'])
-    submissions = get_submissions_by_user(session['user_id'], limit=20)
+    page = request.args.get('page', 1, type=int)
+    submissions, total = get_submissions_by_user(session['user_id'], page=page)
+    total_pages = max(1, (total + 19) // 20)
     return render_template('profile.html',
                            profile_user=user,
                            submissions=submissions,
-                           user=session)
+                           user=session,
+                           page=page, total_pages=total_pages, total=total)
 
 
 @app.route('/profile/edit', methods=['GET', 'POST'])
@@ -167,10 +195,13 @@ def edit_profile():
 @app.route('/problems')
 def problem_list():
     is_admin = session.get('role') == 'admin'
-    problems = get_all_problems(is_admin=is_admin)
+    page = request.args.get('page', 1, type=int)
+    problems, total = get_all_problems(is_admin=is_admin, page=page)
+    total_pages = max(1, (total + 19) // 20)
     return render_template('problems.html',
                            problems=problems,
-                           user=session)
+                           user=session,
+                           page=page, total_pages=total_pages, total=total)
 
 
 @app.route('/problem/<int:problem_id>')
@@ -186,6 +217,12 @@ def problem_detail(problem_id):
         return render_template('error.html',
                                message='题目不存在',
                                user=session), 404
+
+    # 渲染 Markdown 字段为安全 HTML
+    problem['rendered_description'] = render_markdown(problem['description'])
+    problem['rendered_input_format'] = render_markdown(problem['input_format'])
+    problem['rendered_output_format'] = render_markdown(problem['output_format'])
+    problem['rendered_hint'] = render_markdown(problem['hint'])
 
     return render_template('problem_detail.html',
                            problem=problem,
@@ -238,10 +275,13 @@ def submit_code(problem_id):
 @app.route('/submissions')
 @login_required
 def submission_list():
-    submissions = get_submissions_by_user(session['user_id'], limit=50)
+    page = request.args.get('page', 1, type=int)
+    submissions, total = get_submissions_by_user(session['user_id'], page=page)
+    total_pages = max(1, (total + 19) // 20)
     return render_template('submissions.html',
                            submissions=submissions,
-                           user=session)
+                           user=session,
+                           page=page, total_pages=total_pages, total=total)
 
 
 @app.route('/submission/<int:submission_id>')
@@ -270,10 +310,13 @@ def submission_detail(submission_id):
 @login_required
 @admin_required
 def admin_problem_list():
-    problems = get_all_problems(is_admin=True)
+    page = request.args.get('page', 1, type=int)
+    problems, total = get_all_problems(is_admin=True, page=page)
+    total_pages = max(1, (total + 19) // 20)
     return render_template('admin/problems.html',
                            problems=problems,
-                           user=session)
+                           user=session,
+                           page=page, total_pages=total_pages, total=total)
 
 
 @app.route('/admin/create_problem', methods=['GET', 'POST'])
@@ -437,10 +480,13 @@ def admin_delete_test_case(case_id):
 @login_required
 @admin_required
 def admin_user_list():
-    users = get_all_users()
+    page = request.args.get('page', 1, type=int)
+    users, total = get_all_users(page=page)
+    total_pages = max(1, (total + 19) // 20)
     return render_template('admin/users.html',
                            users=users,
-                           user=session)
+                           user=session,
+                           page=page, total_pages=total_pages, total=total)
 
 
 @app.route('/admin/toggle_user/<int:user_id>', methods=['POST'])
@@ -456,10 +502,13 @@ def admin_toggle_user(user_id):
 @login_required
 @admin_required
 def admin_submission_list():
-    submissions = get_all_submissions(limit=200)
+    page = request.args.get('page', 1, type=int)
+    submissions, total = get_all_submissions(page=page)
+    total_pages = max(1, (total + 19) // 20)
     return render_template('admin/submissions.html',
                            submissions=submissions,
-                           user=session)
+                           user=session,
+                           page=page, total_pages=total_pages, total=total)
 
 
 # ==================== 管理员 - 公告管理 ====================

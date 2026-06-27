@@ -47,4 +47,8 @@
     <p class="text-muted text-center" style="padding: 40px;">暂无题目，点击上方按钮创建</p>
     {% endif %}
 </div>
+
+{% from "base.html" import pagination with context %}
+{{ pagination(page, total_pages, total) }}
+
 {% endblock %}

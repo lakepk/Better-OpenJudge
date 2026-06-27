@@ -35,4 +35,8 @@
     <p class="text-muted text-center" style="padding: 40px;">暂无提交记录</p>
     {% endif %}
 </div>
+
+{% from "base.html" import pagination with context %}
+{{ pagination(page, total_pages, total) }}
+
 {% endblock %}

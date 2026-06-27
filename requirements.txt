@@ -2,3 +2,5 @@ flask>=3.0
 gunicorn
 werkzeug
 flask-wtf
+markdown>=3.7
+Pygments>=2.18

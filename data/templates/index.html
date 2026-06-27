@@ -60,4 +60,7 @@
     {% endif %}
 </div>
 
+{% from "base.html" import pagination with context %}
+{{ pagination(page, total_pages, total) }}
+
 {% endblock %}

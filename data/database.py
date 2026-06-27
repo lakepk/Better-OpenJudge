@@ -272,13 +272,21 @@ def update_user_profile(user_id, nickname='', email='', avatar_url=''):
     return True
 
 
-def get_all_users():
+def get_all_users(page=1, per_page=20):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, username, email, role, is_active, created_at, last_login FROM users ORDER BY id")
+    offset = (page - 1) * per_page
+
+    cursor.execute("SELECT COUNT(*) as cnt FROM users")
+    total = cursor.fetchone()['cnt']
+
+    cursor.execute(
+        "SELECT id, username, email, role, is_active, created_at, last_login FROM users ORDER BY id LIMIT ? OFFSET ?",
+        (per_page, offset)
+    )
     users = [dict(row) for row in cursor.fetchall()]
     conn.close()
-    return users
+    return users, total
 
 
 def toggle_user_active(user_id):
@@ -296,16 +304,30 @@ def toggle_user_active(user_id):
 
 
 # problem's command
-def get_all_problems(is_admin=False):
+def get_all_problems(is_admin=False, page=1, per_page=20):
     conn = get_db()
     cursor = conn.cursor()
+    offset = (page - 1) * per_page
+
     if is_admin:
-        cursor.execute("SELECT id, title, difficulty, time_limit, memory_limit, accepted_count, submission_count, is_visible, created_at FROM problems ORDER BY id DESC")
+        cursor.execute("SELECT COUNT(*) as cnt FROM problems")
     else:
-        cursor.execute("SELECT id, title, difficulty, time_limit, memory_limit, accepted_count, submission_count, created_at FROM problems WHERE is_visible = 1 ORDER BY id DESC")
+        cursor.execute("SELECT COUNT(*) as cnt FROM problems WHERE is_visible = 1")
+    total = cursor.fetchone()['cnt']
+
+    if is_admin:
+        cursor.execute(
+            "SELECT id, title, difficulty, time_limit, memory_limit, accepted_count, submission_count, is_visible, created_at FROM problems ORDER BY id DESC LIMIT ? OFFSET ?",
+            (per_page, offset)
+        )
+    else:
+        cursor.execute(
+            "SELECT id, title, difficulty, time_limit, memory_limit, accepted_count, submission_count, created_at FROM problems WHERE is_visible = 1 ORDER BY id DESC LIMIT ? OFFSET ?",
+            (per_page, offset)
+        )
     problems = [dict(row) for row in cursor.fetchall()]
     conn.close()
-    return problems
+    return problems, total
 
 
 def get_problem_by_id(problem_id):
@@ -453,13 +475,21 @@ def update_submission_result(submission_id, status, score=0, time_used=0, memory
     conn.close()
 
 
-def get_submissions_by_user(user_id, limit=50):
+def get_submissions_by_user(user_id, page=1, per_page=20):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT s.id, s.problem_id, p.title as problem_title, s.status, s.score, s.time_used, s.memory_used, s.language, s.created_at FROM submissions s JOIN problems p ON s.problem_id = p.id WHERE s.user_id = ? ORDER BY s.created_at DESC LIMIT ?", (user_id, limit))
+    offset = (page - 1) * per_page
+
+    cursor.execute("SELECT COUNT(*) as cnt FROM submissions WHERE user_id = ?", (user_id,))
+    total = cursor.fetchone()['cnt']
+
+    cursor.execute(
+        "SELECT s.id, s.problem_id, p.title as problem_title, s.status, s.score, s.time_used, s.memory_used, s.language, s.created_at FROM submissions s JOIN problems p ON s.problem_id = p.id WHERE s.user_id = ? ORDER BY s.created_at DESC LIMIT ? OFFSET ?",
+        (user_id, per_page, offset)
+    )
     submissions = [dict(row) for row in cursor.fetchall()]
     conn.close()
-    return submissions
+    return submissions, total
 
 
 def get_submission_detail(submission_id):
@@ -498,9 +528,14 @@ def update_problem_stats(problem_id):
     conn.close()
 
 
-def get_submissions_by_problem(problem_id, limit=50):
+def get_submissions_by_problem(problem_id, page=1, per_page=20):
     conn = get_db()
     cursor = conn.cursor()
+    offset = (page - 1) * per_page
+
+    cursor.execute("SELECT COUNT(*) as cnt FROM submissions WHERE problem_id = ?", (problem_id,))
+    total = cursor.fetchone()['cnt']
+
     cursor.execute("""
         SELECT s.id, s.user_id, u.username, s.status, s.score,
                s.time_used, s.memory_used, s.language, s.created_at
@@ -508,16 +543,21 @@ def get_submissions_by_problem(problem_id, limit=50):
         JOIN users u ON s.user_id = u.id
         WHERE s.problem_id = ?
         ORDER BY s.created_at DESC
-        LIMIT ?
-    """, (problem_id, limit))
+        LIMIT ? OFFSET ?
+    """, (problem_id, per_page, offset))
     submissions = [dict(row) for row in cursor.fetchall()]
     conn.close()
-    return submissions
+    return submissions, total
 
 
-def get_all_submissions(limit=100):
+def get_all_submissions(page=1, per_page=20):
     conn = get_db()
     cursor = conn.cursor()
+    offset = (page - 1) * per_page
+
+    cursor.execute("SELECT COUNT(*) as cnt FROM submissions")
+    total = cursor.fetchone()['cnt']
+
     cursor.execute("""
         SELECT s.id, s.user_id, u.username, s.problem_id, p.title as problem_title,
                s.status, s.score, s.time_used, s.memory_used, s.language, s.created_at
@@ -525,11 +565,11 @@ def get_all_submissions(limit=100):
         JOIN users u ON s.user_id = u.id
         JOIN problems p ON s.problem_id = p.id
         ORDER BY s.created_at DESC
-        LIMIT ?
-    """, (limit,))
+        LIMIT ? OFFSET ?
+    """, (per_page, offset))
     submissions = [dict(row) for row in cursor.fetchall()]
     conn.close()
-    return submissions
+    return submissions, total
 
 
 
