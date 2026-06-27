@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}排行榜 - LiteJudge{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>🏆 排行榜</h2>
+
+    {% if ranking %}
+    <table>
+        <thead>
+            <tr>
+                <th style="width:60px;">排名</th>
+                <th>用户</th>
+                <th style="width:80px;">通过题数</th>
+                <th style="width:80px;">AC 次数</th>
+                <th style="width:80px;">总提交</th>
+                <th style="width:90px;">通过率</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in ranking %}
+            <tr>
+                <td>
+                    {% set rank = (page - 1) * 50 + loop.index %}
+                    {% if rank == 1 %}
+                        <strong style="color:#f39c12; font-size:18px;">🥇</strong>
+                    {% elif rank == 2 %}
+                        <strong style="color:#aaa; font-size:18px;">🥈</strong>
+                    {% elif rank == 3 %}
+                        <strong style="color:#cd7f32; font-size:18px;">🥉</strong>
+                    {% else %}
+                        <span style="color:#888;">{{ rank }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="/profile?id={{ r.id }}">{{ r.nickname or r.username }}</a>
+                </td>
+                <td><strong>{{ r.solved_count }}</strong></td>
+                <td>{{ r.ac_count }}</td>
+                <td>{{ r.submission_count }}</td>
+                <td>
+                    {% if r.submission_count > 0 %}
+                        {{ ((r.ac_count / r.submission_count) * 100) | round(1) }}%
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted text-center" style="padding: 40px;">暂无排行数据</p>
+    {% endif %}
+</div>
+
+<div class="text-muted text-center" style="margin-bottom: 10px; font-size: 13px;">
+    按通过题数降序排列。通过题数相同则按 AC 次数排序。
+</div>
+
+{% from "base.html" import pagination with context %}
+{{ pagination(page, total_pages, total) }}
+
+{% endblock %}

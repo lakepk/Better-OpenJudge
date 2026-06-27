@@ -3,16 +3,41 @@
 {% block content %}
 <div class="card">
     <h2>题目列表</h2>
+
+    <!-- 搜索筛选栏 -->
+    <form method="get" class="search-bar">
+        <input type="text" name="search" placeholder="搜索题目标题…" value="{{ search or '' }}">
+        <select name="difficulty">
+            <option value="0" {% if not difficulty or difficulty == 0 %}selected{% endif %}>全部难度</option>
+            <option value="1" {% if difficulty == 1 %}selected{% endif %}>★ 简单</option>
+            <option value="2" {% if difficulty == 2 %}selected{% endif %}>★★ 中等</option>
+            <option value="3" {% if difficulty == 3 %}selected{% endif %}>★★★ 困难</option>
+        </select>
+        <select name="tag">
+            <option value="">全部标签</option>
+            {% for t in all_tags %}
+                <option value="{{ t.name }}" {% if tag == t.name %}selected{% endif %}>{{ t.name }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary btn-sm">筛选</button>
+        {% if search or difficulty or tag %}
+            <a href="/problems" class="btn btn-secondary btn-sm">清除</a>
+        {% endif %}
+    </form>
+
     {% if problems %}
     <table>
         <thead>
             <tr>
-                <th>#</th>
+                <th style="width:50px;">#</th>
                 <th>标题</th>
-                <th>难度</th>
-                <th>时间限制</th>
-                <th>内存限制</th>
-                <th>通过率</th>
+                {% if user and user.user_id %}
+                    <th style="width:50px;">状态</th>
+                {% endif %}
+                <th style="width:80px;">难度</th>
+                <th style="width:90px;">时间限制</th>
+                <th style="width:100px;">内存限制</th>
+                <th style="width:80px;">通过率</th>
             </tr>
         </thead>
         <tbody>
@@ -25,8 +50,17 @@
                         <span class="text-muted">[隐藏]</span>
                     {% endif %}
                 </td>
+                {% if user and user.user_id %}
+                    <td>
+                        {% if p.id in user_ac_set %}
+                            <span class="ac-mark solved" title="已通过">✓</span>
+                        {% else %}
+                            <span class="ac-mark unsolved" title="未通过">✗</span>
+                        {% endif %}
+                    </td>
+                {% endif %}
                 <td>
-                    <span class="difficulty 
+                    <span class="difficulty
                         {% if p.difficulty == 1 %}difficulty-easy
                         {% elif p.difficulty == 2 %}difficulty-medium
                         {% else %}difficulty-hard{% endif %}">
@@ -45,7 +79,13 @@
         </tbody>
     </table>
     {% else %}
-    <p class="text-muted text-center" style="padding: 40px;">暂无题目</p>
+    <p class="text-muted text-center" style="padding: 40px;">
+        {% if search or difficulty or tag %}
+            没有匹配的题目，<a href="/problems">查看全部</a>
+        {% else %}
+            暂无题目
+        {% endif %}
+    </p>
     {% endif %}
 </div>
 

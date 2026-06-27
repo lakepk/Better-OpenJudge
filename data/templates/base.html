@@ -151,6 +151,18 @@
         .pagination .disabled { color: #aaa; background: #f5f5f5; border: 1px solid #eee; cursor: not-allowed; }
         .pagination .info { color: #888; font-size: 12px; margin: 0 8px; }
 
+        /* 搜索筛选栏 */
+        .search-bar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: flex-end; }
+        .search-bar input, .search-bar select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; font-family: inherit; }
+        .search-bar input { flex: 1; min-width: 160px; }
+        .search-bar input:focus, .search-bar select:focus { outline: none; border-color: #e94560; }
+        .search-bar button { padding: 8px 18px; }
+
+        /* AC 标记 */
+        .ac-mark { font-weight: bold; font-size: 16px; }
+        .ac-mark.solved { color: #27ae60; }
+        .ac-mark.unsolved { color: #e74c3c; }
+
         a { color: #e94560; }
     </style>
 </head>
@@ -160,6 +172,7 @@
         <div class="brand"><a href="/">LiteJudge</a></div>
         <div class="links">
             <a href="/problems">题目</a>
+            <a href="/ranking">排行榜</a>
             {% if user and user.user_id %}
                 <a href="/submissions">我的提交</a>
             {% endif %}
@@ -188,8 +201,8 @@
     {% if total_pages > 1 %}
     <div class="pagination">
         {% if page > 1 %}
-            <a href="?page=1">首页</a>
-            <a href="?page={{ page - 1 }}">上一页</a>
+            <a href="{{ page_url(1) }}">首页</a>
+            <a href="{{ page_url(page - 1) }}">上一页</a>
         {% else %}
             <span class="disabled">首页</span>
             <span class="disabled">上一页</span>
@@ -203,14 +216,14 @@
             {% if p == page %}
                 <span class="current">{{ p }}</span>
             {% else %}
-                <a href="?page={{ p }}">{{ p }}</a>
+                <a href="{{ page_url(p) }}">{{ p }}</a>
             {% endif %}
         {% endfor %}
         {% if ns.end < total_pages %}<span>…</span>{% endif %}
 
         {% if page < total_pages %}
-            <a href="?page={{ page + 1 }}">下一页</a>
-            <a href="?page={{ total_pages }}">末页</a>
+            <a href="{{ page_url(page + 1) }}">下一页</a>
+            <a href="{{ page_url(total_pages) }}">末页</a>
         {% else %}
             <span class="disabled">下一页</span>
             <span class="disabled">末页</span>

@@ -27,7 +27,7 @@ def init_db():
             avatar_url TEXT DEFAULT '',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             last_login TIMESTAMP,
-            is_active BOOLEAN DEFAULT 1
+            is_active BOOLEAN DEFAULT 1,
             failed_login_attempts INTEGER DEFAULT 0,
             locked_until TIMESTAMP
         )
@@ -126,7 +126,7 @@ def init_db():
     except sqlite3.OperationalError:
         pass
     try:
-        cursor.execute("ALTER TABLE users ADD COLUMN locked until TIMESTAMP")
+        cursor.execute("ALTER TABLE users ADD COLUMN locked_until TIMESTAMP")
     except sqlite3.OperationalError:
         pass
 
@@ -203,18 +203,19 @@ def is_account_locked(username):
     conn.close()
     if row and row['locked_until']:
         import datetime
-        locked_until = datetime.datetime.fromisocalendar(row['locked_until'])
+        locked_until = datetime.datetime.fromisoformat(row['locked_until'])
         if locked_until > datetime.datetime.now():
-            return True, f"账号已被锁定，请{int((locked_until - datetime.datetime.now()).total_seconds() // 60)} 分钟后重试"
-        return False, ""
+            wait_minutes = int((locked_until - datetime.datetime.now()).total_seconds() // 60) + 1
+            return True, f"账号已被锁定，请 {wait_minutes} 分钟后重试"
+    return False, ""
 
 
 def record_login_failure(username):
-    """记录登记失败，超过阈值自动锁定"""
+    """记录登录失败，超过阈值自动锁定"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
-        "UPDATE users SET failed_login_attempts = failed_login_attempta + 1 WHERE username = ?",
+        "UPDATE users SET failed_login_attempts = failed_login_attempts + 1 WHERE username = ?",
         (username,)
     )
     cursor.execute(
@@ -229,8 +230,8 @@ def record_login_failure(username):
             "UPDATE users SET locked_until = ? WHERE username = ?",
             (lock_until.isoformat(), username)
         )
-        conn.commit()
-        conn.close()
+    conn.commit()
+    conn.close()
 
 
 def reset_login_failures(username):
@@ -304,27 +305,53 @@ def toggle_user_active(user_id):
 
 
 # problem's command
-def get_all_problems(is_admin=False, page=1, per_page=20):
+def get_all_problems(is_admin=False, page=1, per_page=20, search='', difficulty=None, tag=None):
+    """获取题目列表，支持搜索、难度筛选、标签筛选、分页"""
     conn = get_db()
     cursor = conn.cursor()
     offset = (page - 1) * per_page
 
-    if is_admin:
-        cursor.execute("SELECT COUNT(*) as cnt FROM problems")
+    conditions = []
+    params = []
+
+    if not is_admin:
+        conditions.append("p.is_visible = 1")
+
+    if search:
+        conditions.append("p.title LIKE ?")
+        params.append(f"%{search}%")
+
+    if difficulty is not None and difficulty > 0:
+        conditions.append("p.difficulty = ?")
+        params.append(difficulty)
+
+    where_clause = " AND ".join(conditions) if conditions else "1=1"
+
+    # 标签筛选需要 JOIN
+    if tag:
+        tag_join = "JOIN problem_tags pt_filter ON p.id = pt_filter.problem_id JOIN tags t_filter ON pt_filter.tag_id = t_filter.id"
+        tag_cond = " AND t_filter.name = ?"
+        count_params = params + [tag]  # params for COUNT
+        query_params = params + [tag]  # params for SELECT
     else:
-        cursor.execute("SELECT COUNT(*) as cnt FROM problems WHERE is_visible = 1")
+        tag_join = ""
+        tag_cond = ""
+        count_params = list(params)
+        query_params = list(params)
+
+    # COUNT 查询
+    count_sql = f"SELECT COUNT(DISTINCT p.id) as cnt FROM problems p {tag_join} WHERE {where_clause}{tag_cond}"
+    cursor.execute(count_sql, count_params)
     total = cursor.fetchone()['cnt']
 
+    # 数据查询
+    columns = "p.id, p.title, p.difficulty, p.time_limit, p.memory_limit, p.accepted_count, p.submission_count"
     if is_admin:
-        cursor.execute(
-            "SELECT id, title, difficulty, time_limit, memory_limit, accepted_count, submission_count, is_visible, created_at FROM problems ORDER BY id DESC LIMIT ? OFFSET ?",
-            (per_page, offset)
-        )
-    else:
-        cursor.execute(
-            "SELECT id, title, difficulty, time_limit, memory_limit, accepted_count, submission_count, created_at FROM problems WHERE is_visible = 1 ORDER BY id DESC LIMIT ? OFFSET ?",
-            (per_page, offset)
-        )
+        columns += ", p.is_visible"
+    columns += ", p.created_at"
+
+    data_sql = f"SELECT DISTINCT {columns} FROM problems p {tag_join} WHERE {where_clause}{tag_cond} ORDER BY p.id DESC LIMIT ? OFFSET ?"
+    cursor.execute(data_sql, query_params + [per_page, offset])
     problems = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return problems, total
@@ -445,6 +472,50 @@ def get_all_tags():
     tags = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return tags
+
+
+def get_user_ac_problem_ids(user_id):
+    """获取某用户所有已 AC 的题目 ID 集合"""
+    if not user_id:
+        return set()
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT DISTINCT problem_id FROM submissions WHERE user_id = ? AND status = 'AC'",
+        (user_id,)
+    )
+    ac_ids = {row['problem_id'] for row in cursor.fetchall()}
+    conn.close()
+    return ac_ids
+
+
+def get_ranking(page=1, per_page=50):
+    """获取用户排行榜，按 AC 题数降序排列"""
+    conn = get_db()
+    cursor = conn.cursor()
+    offset = (page - 1) * per_page
+
+    cursor.execute(
+        "SELECT COUNT(DISTINCT u.id) as cnt FROM users u WHERE u.is_active = 1"
+    )
+    total = cursor.fetchone()['cnt']
+
+    cursor.execute("""
+        SELECT
+            u.id, u.username, u.nickname, u.avatar_url,
+            COUNT(s.id) as submission_count,
+            SUM(CASE WHEN s.status = 'AC' THEN 1 ELSE 0 END) as ac_count,
+            COUNT(DISTINCT CASE WHEN s.status = 'AC' THEN s.problem_id END) as solved_count
+        FROM users u
+        LEFT JOIN submissions s ON u.id = s.user_id
+        WHERE u.is_active = 1
+        GROUP BY u.id
+        ORDER BY solved_count DESC, ac_count DESC, submission_count ASC
+        LIMIT ? OFFSET ?
+    """, (per_page, offset))
+    ranking = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return ranking, total
 
 
 

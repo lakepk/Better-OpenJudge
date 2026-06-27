@@ -14,6 +14,16 @@ csrf = CSRFProtect(app)
 init_db()
 
 
+@app.context_processor
+def inject_utils():
+    """注入模板工具函数"""
+    def page_url(page_num):
+        args = dict(request.args)
+        args['page'] = str(page_num)
+        return '?' + '&'.join(f'{k}={v}' for k, v in args.items())
+    return dict(page_url=page_url, all_tags=get_all_tags())
+
+
 def render_markdown(text):
     """将 Markdown 文本安全渲染为 HTML，消除 XSS 风险"""
     if not text:
@@ -61,13 +71,25 @@ def admin_required(f):
 def index():
     announcements = get_announcements()
     page = request.args.get('page', 1, type=int)
-    problems, total = get_all_problems(is_admin=(session.get('role') == 'admin'), page=page)
+    search = request.args.get('search', '').strip()
+    difficulty = request.args.get('difficulty', None, type=int)
+    tag = request.args.get('tag', '').strip() or None
+
+    is_admin = session.get('role') == 'admin'
+    problems, total = get_all_problems(is_admin=is_admin, page=page,
+                                        search=search, difficulty=difficulty, tag=tag)
     total_pages = max(1, (total + 19) // 20)
+
+    # 已登录用户获取 AC 题目 ID 集合
+    user_ac_set = get_user_ac_problem_ids(session.get('user_id')) if session.get('user_id') else set()
+
     return render_template('index.html',
                            user=session,
                            problems=problems,
                            announcements=announcements,
-                           page=page, total_pages=total_pages, total=total)
+                           user_ac_set=user_ac_set,
+                           page=page, total_pages=total_pages, total=total,
+                           search=search, difficulty=difficulty or 0, tag=tag)
 
 @app.route('/health')
 def health_check():
@@ -157,6 +179,18 @@ def logout():
     return redirect(url_for('index'))
 
 
+# ==================== 排行榜 ====================
+@app.route('/ranking')
+def ranking():
+    page = request.args.get('page', 1, type=int)
+    ranking_data, total = get_ranking(page=page, per_page=50)
+    total_pages = max(1, (total + 49) // 50)
+    return render_template('ranking.html',
+                           user=session,
+                           ranking=ranking_data,
+                           page=page, total_pages=total_pages, total=total)
+
+
 # ==================== 用户个人中心 ====================
 @app.route('/profile')
 @login_required
@@ -196,12 +230,23 @@ def edit_profile():
 def problem_list():
     is_admin = session.get('role') == 'admin'
     page = request.args.get('page', 1, type=int)
-    problems, total = get_all_problems(is_admin=is_admin, page=page)
+    search = request.args.get('search', '').strip()
+    difficulty = request.args.get('difficulty', None, type=int)
+    tag = request.args.get('tag', '').strip() or None
+
+    problems, total = get_all_problems(is_admin=is_admin, page=page,
+                                        search=search, difficulty=difficulty, tag=tag)
     total_pages = max(1, (total + 19) // 20)
+
+    # 已登录用户获取 AC 题目 ID 集合
+    user_ac_set = get_user_ac_problem_ids(session.get('user_id')) if session.get('user_id') else set()
+
     return render_template('problems.html',
                            problems=problems,
                            user=session,
-                           page=page, total_pages=total_pages, total=total)
+                           user_ac_set=user_ac_set,
+                           page=page, total_pages=total_pages, total=total,
+                           search=search, difficulty=difficulty or 0, tag=tag)
 
 
 @app.route('/problem/<int:problem_id>')
