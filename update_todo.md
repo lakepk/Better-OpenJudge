@@ -18,7 +18,7 @@
   - **如何优化**：引入 `flask-wtf` 为所有表单生成 CSRF token，或在 `@app.before_request` 中对 POST 请求校验自定义 CSRF header。模板中 `<form>` 加 `{{ csrf_token() }}`。
   - **主要责任人**：data（模板 + 路由），web（如需中间件全局拦截）
 
-- [ ] **登录限速**
+- [x] **登录限速**
 
   - **现状**：[data/app.py](data/app.py) `/login` 路由无任何频率限制，攻击者可无限尝试密码进行暴力破解。
   - **如何优化**：引入 `Flask-Limiter`，对 `/login` 路由限制为每 IP 每分钟 5 次失败后锁定 15 分钟。或手动在 `database.py` 中记录失败次数和时间戳。
@@ -132,7 +132,7 @@
 
 ## 🟢 P3 — 工程与运维
 
-- [ ] **SQLite 并发方案**
+- [x] **SQLite 并发方案**
 
   - **现状**：SQLite 默认 rollback journal 模式，写操作锁全库。当前架构有 3 个 gunicorn worker + judge 后台线程同时读写，高峰期必然 "database is locked"。
   - **如何优化**：启用 WAL 模式（`PRAGMA journal_mode=WAL;`），读写互不阻塞。设置 `PRAGMA busy_timeout=5000;` 让写入等锁而非立即报错。若未来用户量增大，考虑迁移到 PostgreSQL。
@@ -144,7 +144,7 @@
   - **如何优化**：配置 Python `logging` 模块（JSON 格式输出到 stdout，Docker 自动收集）。在 bridge、app、database 关键路径加 `logger.info()` / `logger.error()`。记录：每次评测的开始/结束/耗时、数据库错误、用户登录失败。
   - **主要责任人**：web（bridge.py）+ data（app.py + database.py）
 
-- [ ] **健康检查端点**
+- [x] **健康检查端点**
 
   - **现状**：无 `/health` 或 `/ping`。Docker 的 `restart: unless-stopped` 只能检测进程崩溃，不能检测"进程活着但应用挂了"。
   - **如何优化**：新增 `@app.route('/health')` 返回 200 + `{"status": "ok"}`。可扩展为检查数据库连接是否正常。
