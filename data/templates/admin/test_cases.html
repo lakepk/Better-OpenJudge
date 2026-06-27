@@ -31,6 +31,7 @@
                 <td><pre style="max-width:200px; max-height:60px; overflow:auto; font-size:12px; margin:0;">{{ tc.output }}</pre></td>
                 <td>
                     <form method="post" action="/admin/delete_test_case/{{ tc.id }}" style="display:inline;" onsubmit="confirmDelete(this); return false;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-danger btn-sm">删除</button>
                     </form>
                 </td>

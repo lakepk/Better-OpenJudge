@@ -30,6 +30,7 @@
                 <td class="text-muted">{{ u.created_at }}</td>
                 <td>
                     <form method="post" action="/admin/toggle_user/{{ u.id }}" style="display:inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         {% if u.is_active %}
                             <button type="submit" class="btn btn-danger btn-sm">禁用</button>
                         {% else %}

@@ -5,6 +5,7 @@
     <h2>添加测试点: {{ problem.title }}</h2>
 
     <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
             <label>测试点序号</label>
             <input type="number" name="case_order" value="1" min="1">

@@ -5,6 +5,7 @@
     <h2>编辑资料</h2>
 
     <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
             <label>昵称</label>
             <input type="text" name="nickname" value="{{ profile_user.nickname or '' }}" placeholder="显示名称">

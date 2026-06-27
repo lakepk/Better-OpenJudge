@@ -12,6 +12,7 @@
     {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
 
     <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
             <label>编程语言</label>
             <select name="language">

@@ -6,6 +6,8 @@ def get_db():
     """Get a connection to the database."""
     conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row  # Enable dict-like access to rows
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA busy_timeout=5000;")
     return conn
 
 def init_db():
@@ -26,6 +28,8 @@ def init_db():
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             last_login TIMESTAMP,
             is_active BOOLEAN DEFAULT 1
+            failed_login_attempts INTEGER DEFAULT 0,
+            locked_until TIMESTAMP
         )
     ''')
     
@@ -117,6 +121,15 @@ def init_db():
         )
     ''')
 
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN locked until TIMESTAMP")
+    except sqlite3.OperationalError:
+        pass
+
     conn.commit()
     conn.close()
     print("Database Initialized Successfully.")
@@ -157,6 +170,14 @@ def verify_user(username, password):
         conn.close()
         return False, "用户名不存在或已被禁用"
     
+    # === new: 服务端二次检查锁定状态 ===
+    if user['locked_until']:
+        import datetime
+        locked_until = datetime.datetime.fromisoformat(user['locked_until'])
+        if locked_until > datetime.datetime.now():
+            conn.close()
+            return False, "账号已被锁定，请稍后重试"
+    
     if check_password_hash(user['password_hash'], password):
         cursor.execute("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?", (user['id'],))
         conn.commit()
@@ -165,6 +186,63 @@ def verify_user(username, password):
     else:
         conn.close()
         return False, "密码错误"
+    
+
+MAX_LOGIN_ATTEMPTS = 5
+LOCKOUT_MINUTES = 15
+
+def is_account_locked(username):
+    """检查账号是否在锁定期内"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT locked_until FROM users WHERE username = ?",
+        (username,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    if row and row['locked_until']:
+        import datetime
+        locked_until = datetime.datetime.fromisocalendar(row['locked_until'])
+        if locked_until > datetime.datetime.now():
+            return True, f"账号已被锁定，请{int((locked_until - datetime.datetime.now()).total_seconds() // 60)} 分钟后重试"
+        return False, ""
+
+
+def record_login_failure(username):
+    """记录登记失败，超过阈值自动锁定"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE users SET failed_login_attempts = failed_login_attempta + 1 WHERE username = ?",
+        (username,)
+    )
+    cursor.execute(
+        "SELECT failed_login_attempts FROM users WHERE username = ?",
+        (username,)
+    )
+    attempts = cursor.fetchone()
+    if attempts and attempts['failed_login_attempts'] >= MAX_LOGIN_ATTEMPTS:
+        import datetime
+        lock_until = datetime.datetime.now() + datetime.timedelta(minutes=LOCKOUT_MINUTES)
+        cursor.execute(
+            "UPDATE users SET locked_until = ? WHERE username = ?",
+            (lock_until.isoformat(), username)
+        )
+        conn.commit()
+        conn.close()
+
+
+def reset_login_failures(username):
+    """登录成功后重新计数"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE username = ?",
+        (username,)
+    )
+    conn.commit()
+    conn.close()
     
 
 def get_user_by_id(user_id):

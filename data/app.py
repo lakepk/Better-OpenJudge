@@ -3,9 +3,11 @@ import os
 from flask import Flask, render_template, request, redirect, url_for, session
 from functools import wraps
 from database import *
+from flask_wtf.csrf import CSRFProtect
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-use-env-var-in-production')
+csrf = CSRFProtect(app)
 
 # 启动时初始化数据库
 init_db()
@@ -41,6 +43,16 @@ def index():
                            user=session,
                            problems=problems,
                            announcements=announcements)
+
+@app.route('/health')
+def health_check():
+    try:
+        conn = get_db()
+        conn.execute("SELECT 1")
+        conn.close()
+        return {"status":"ok", "database":"connected"}, 200
+    except Exception as e:
+        return {"status":"error", "database":str(e)}, 503
 
 
 # ==================== 用户系统 ====================
@@ -92,15 +104,23 @@ def login():
 
         if not username or not password:
             return render_template('login.html', error='请输入用户名和密码', user=session)
+        
+        # === 新增：检查是否被否定 ===
+        locked, lock_msg = is_account_locked(username)
+        if locked:
+            return render_template('login.html', error=lock_msg, user=session)
+        # ===========================
 
         success, result = verify_user(username, password)
         if success:
+            reset_login_failures(username) # new
             session['user_id'] = result['id']
             session['username'] = result['username']
             session['role'] = result['role']
             session['nickname'] = result['nickname']
             return redirect(url_for('index'))
         else:
+            record_login_failure(username) #new
             return render_template('login.html', error=result, user=session)
 
     return render_template('login.html', error=request.args.get('error'), user=session)

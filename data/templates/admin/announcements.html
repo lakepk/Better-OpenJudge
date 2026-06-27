@@ -29,6 +29,7 @@
                 <td class="text-muted">{{ a.created_at }}</td>
                 <td>
                     <form method="post" action="/admin/delete_announcement/{{ a.id }}" style="display:inline;" onsubmit="confirmDelete(this); return false;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-danger btn-sm">删除</button>
                     </form>
                 </td>

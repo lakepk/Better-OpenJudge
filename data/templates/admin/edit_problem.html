@@ -5,6 +5,7 @@
     <h2>编辑题目: {{ problem.title }}</h2>
 
     <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
             <label>题目标题 *</label>
             <input type="text" name="title" value="{{ problem.title }}" required>

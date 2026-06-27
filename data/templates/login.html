@@ -8,6 +8,7 @@
     {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
 
     <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
             <label>用户名</label>
             <input type="text" name="username" placeholder="请输入用户名" required>

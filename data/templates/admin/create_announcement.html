@@ -5,6 +5,7 @@
     <h2>创建公告</h2>
 
     <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
             <label>标题 *</label>
             <input type="text" name="title" required>
