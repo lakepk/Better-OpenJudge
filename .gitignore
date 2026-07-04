@@ -28,3 +28,5 @@ ENV/
 .vscode/
 .idea/
 .DS_Store
+
+tmp/

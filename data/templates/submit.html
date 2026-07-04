@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}提交代码 - {{ problem.title }} - LiteJudge{% endblock %}
+{% block title %}提交代码 - {{ problem.title }} - OpenJudge{% endblock %}
 {% block content %}
 <div class="card">
     <h2>提交代码: {{ problem.title }}</h2>
@@ -22,76 +22,73 @@
         </div>
         <div class="form-group">
             <label>代码</label>
-            <div id="editor-container" style="border: 1px solid #333; border-radius: 6px; overflow: hidden;"></div>
-            <!-- CodeMirror 会接管此 textarea，但保留它作为表单提交的载体 -->
-            <textarea name="code" id="code-textarea" class="code-editor" placeholder="在此粘贴你的代码..." style="display:none;"></textarea>
+            <!-- Ace Editor 容器，初始隐藏 -->
+            <div id="ace-editor" style="height:400px; border:1px solid #333; border-radius:6px; font-size:14px; display:none;"></div>
+            <!-- 降级 textarea：Ace 加载失败时可用 -->
+            <textarea name="code" id="fallback-textarea" class="code-editor" placeholder="// 在此粘贴或输入你的代码..."
+                      style="height:400px; font-size:14px;">{{ code or '' }}</textarea>
         </div>
         <button type="submit" class="btn btn-primary">提交评测</button>
         <a href="/problem/{{ problem.id }}" class="btn btn-secondary">返回题目</a>
     </form>
 </div>
 
-<!-- CodeMirror 6 ESM -->
-<script type="module">
-import {EditorView, basicSetup} from "https://esm.sh/codemirror@6.0.1";
-import {cpp} from "https://esm.sh/@codemirror/lang-cpp@6";
-import {python} from "https://esm.sh/@codemirror/lang-python@6";
-import {oneDark} from "https://esm.sh/@codemirror/theme-one-dark@6";
+<script>
+(function() {
+    var fallback = document.getElementById('fallback-textarea');
+    var langSelect = document.getElementById('language-select');
+    var aceLoaded = false;
 
-const languageMap = {
-    cpp: cpp(),
-    python: python(),
-};
+    // If Ace loads before the timeout, upgrade from textarea to Ace
+    window.aceUpgrade = function() {
+        if (aceLoaded) return;
+        aceLoaded = true;
 
-// 初始语言
-let currentLang = document.getElementById('language-select').value;
+        var aceContainer = document.getElementById('ace-editor');
+        aceContainer.style.display = 'block';
+        fallback.style.display = 'none';
 
-const editor = new EditorView({
-    doc: '',
-    extensions: [
-        basicSetup,
-        languageMap[currentLang],
-        oneDark,
-        EditorView.updateListener.of(function(update) {
-            if (update.docChanged) {
-                document.getElementById('code-textarea').value = update.state.doc.toString();
-            }
-        }),
-        EditorView.theme({
-            "&": { height: "400px" },
-            ".cm-scroller": { overflow: "auto" },
-            ".cm-content": { fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", "Courier New", monospace', fontSize: "14px" },
-            ".cm-gutters": { fontFamily: '"JetBrains Mono", "Fira Code", monospace' },
-        }),
-    ],
-    parent: document.getElementById('editor-container'),
-});
+        var editor = ace.edit('ace-editor', {
+            theme: 'ace/theme/monokai',
+            mode: 'ace/mode/c_cpp',
+            fontSize: '14px',
+            showPrintMargin: false,
+            enableBasicAutocompletion: true,
+            enableLiveAutocompletion: true,
+            enableSnippets: true,
+        });
 
-// 初始同步一次 textarea
-document.getElementById('code-textarea').value = '';
+        // Copy any existing code from textarea into Ace
+        if (fallback.value) {
+            editor.setValue(fallback.value, -1);
+        }
 
-// 语言切换
-document.getElementById('language-select').addEventListener('change', function() {
-    const newLang = this.value;
-    if (newLang === currentLang) return;
-    currentLang = newLang;
-    editor.dispatch({
-        effects: EditorView.reconfigure.of([
-            basicSetup,
-            languageMap[currentLang],
-            oneDark,
-            EditorView.updateListener.of(function(update) {
-                if (update.docChanged) {
-                    document.getElementById('code-textarea').value = update.state.doc.toString();
-                }
-            }),
-        ]),
+        // Sync Ace → textarea (for form submission)
+        editor.session.on('change', function() {
+            fallback.value = editor.getValue();
+        });
+
+        // Language switch
+        var modeMap = { cpp: 'ace/mode/c_cpp', python: 'ace/mode/python' };
+        langSelect.addEventListener('change', function() {
+            editor.session.setMode(modeMap[this.value] || 'ace/mode/c_cpp');
+        });
+    };
+
+    // Language change also updates the textarea mode visually
+    langSelect.addEventListener('change', function() {
+        if (!aceLoaded && this.value === 'python') {
+            fallback.placeholder = '# 在此粘贴或输入你的代码...';
+        } else if (!aceLoaded) {
+            fallback.placeholder = '// 在此粘贴或输入你的代码...';
+        }
     });
-});
+})();
+</script>
 
-// 表单提交前同步
-document.getElementById('submit-form').addEventListener('submit', function() {
-    document.getElementById('code-textarea').value = editor.state.doc.toString();
-});
+<!-- Ace Editor: onload triggers upgrade -->
+<script src="https://cdn.jsdelivr.net/npm/ace-builds@1.36.5/src-min-noconflict/ace.js"
+        onload="aceUpgrade()"
+        onerror="console.info('Ace CDN unreachable, using textarea fallback')">
 </script>
 {% endblock %}

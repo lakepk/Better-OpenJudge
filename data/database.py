@@ -650,8 +650,15 @@ def get_submission_detail(submission_id):
 
 
 def update_problem_stats(problem_id):
+    """Atomically recompute submission_count and accepted_count for a problem.
+
+    Wrapped in BEGIN IMMEDIATE to prevent a race where two concurrent
+    judge threads read the same state, then the faster thread's UPDATE
+    is overwritten by the slower thread's stale data.
+    """
     conn = get_db()
     cursor = conn.cursor()
+    cursor.execute("BEGIN IMMEDIATE")
     cursor.execute(
         "SELECT COUNT(*) as total FROM submissions WHERE problem_id = ?",
         (problem_id,)
