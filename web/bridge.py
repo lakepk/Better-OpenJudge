@@ -5,11 +5,12 @@ Patches database.create_submission so every code submission
 automatically triggers a background judge thread.
 """
 import json
+import logging
 import os
 import shutil
 import sys
 import tempfile
-import threading
+from concurrent.futures import ThreadPoolExecutor
 
 
 # ── Path setup ──────────────────────────────────────────────
@@ -34,6 +35,23 @@ if os.environ.get('DATABASE_PATH'):
 # DATABASE override above actually takes effect.
 sys.modules['database'] = db_module
 
+# ── Logging ──────────────────────────────────────────────────
+LOG_FORMAT = '{"time": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "message": "%(message)s"}'
+logging.basicConfig(
+    level=logging.INFO,
+    format=LOG_FORMAT,
+    datefmt='%Y-%m-%dT%H:%M:%S',
+    stream=sys.stdout,
+)
+logger = logging.getLogger('bridge')
+
+# ── Judge concurrency control ─────────────────────────────────
+_JUDGE_POOL = ThreadPoolExecutor(
+    max_workers=int(os.environ.get('JUDGE_MAX_WORKERS', '4')),
+    thread_name_prefix='judge',
+)
+logger.info("Judge pool initialized: max_workers=%d", _JUDGE_POOL._max_workers)
+
 # Re-import from the (possibly reconfigured) database module
 from data.database import (
     get_submission_detail,
@@ -49,23 +67,31 @@ from judge.core.controller import JudgeController
 from judge.core.runner import Runner
 
 # ── Fix: runner.py hardcodes "memory":0 — monkey-patch real measurement ──
-import resource
+# resource module is Unix-only; on Windows skip memory measurement.
+try:
+    import resource
+    _HAS_RESOURCE = True
+except ImportError:
+    _HAS_RESOURCE = False
 
-_original_run_single_case = Runner.run_single_case
+if _HAS_RESOURCE:
+    _original_run_single_case = Runner.run_single_case
 
-def _patched_run_single_case(self, input_file, output_file, time_limit, memory_limit):
-    """Wrapper that adds actual memory measurement via getrusage()."""
-    before = resource.getrusage(resource.RUSAGE_CHILDREN)
-    result = _original_run_single_case(self, input_file, output_file,
-                                       time_limit, memory_limit)
-    after = resource.getrusage(resource.RUSAGE_CHILDREN)
-    # ru_maxrss is in KB on Linux; convert to MB (the unit the DB expects)
-    memory_kb = after.ru_maxrss - before.ru_maxrss
-    if memory_kb > 0:
-        result['memory'] = round(memory_kb / 1024, 2)
-    return result
+    def _patched_run_single_case(self, input_file, output_file, time_limit, memory_limit):
+        """Wrapper that adds actual memory measurement via getrusage()."""
+        before = resource.getrusage(resource.RUSAGE_CHILDREN)
+        result = _original_run_single_case(self, input_file, output_file,
+                                           time_limit, memory_limit)
+        after = resource.getrusage(resource.RUSAGE_CHILDREN)
+        # ru_maxrss is in KB on Linux; convert to MB (the unit the DB expects)
+        memory_kb = after.ru_maxrss - before.ru_maxrss
+        if memory_kb > 0:
+            result['memory'] = round(memory_kb / 1024, 2)
+        return result
 
-Runner.run_single_case = _patched_run_single_case
+    Runner.run_single_case = _patched_run_single_case
+else:
+    logger.info("Running on Windows — memory measurement via getrusage disabled")
 
 # ── Status mapping: JudgeStatus strings → DB short codes ────
 _STATUS_MAP = {
@@ -85,19 +111,28 @@ _STATUS_MAP = {
 
 def _run_judge(submission_id: int) -> None:
     """Fetch data from DB, run the judge engine, write results back."""
+    import time
+    t_start = time.time()
+    logger.info("Judge start: submission_id=%d", submission_id)
+
     # 1. Load from database
     submission = get_submission_detail(submission_id)
     if not submission:
+        logger.error("Judge abort: submission_id=%d not found", submission_id)
         return
 
     problem = get_problem_by_id(submission['problem_id'])
     if not problem:
+        logger.error("Judge abort: problem_id=%d not found for submission_id=%d",
+                      submission['problem_id'], submission_id)
         update_submission_result(submission_id, status="SE",
                                  judge_detail="Problem not found")
         return
 
     test_cases = get_test_cases(submission['problem_id'])
     if not test_cases:
+        logger.error("Judge abort: no test cases for problem_id=%d, submission_id=%d",
+                      submission['problem_id'], submission_id)
         update_submission_result(submission_id, status="SE",
                                  judge_detail="No test cases configured")
         return
@@ -173,7 +208,16 @@ def _run_judge(submission_id: int) -> None:
         # 6. Refresh problem statistics (total / AC counts)
         update_problem_stats(submission['problem_id'])
 
+        elapsed = round(time.time() - t_start, 2)
+        logger.info(
+            "Judge done: submission_id=%d, status=%s, score=%d, elapsed=%.2fs",
+            submission_id, db_status, _calc_score(result, test_cases), elapsed,
+        )
+
     except Exception as exc:
+        logger.exception(
+            "Judge internal error: submission_id=%d", submission_id,
+        )
         update_submission_result(
             submission_id,
             status="SE",
@@ -200,13 +244,23 @@ def _calc_score(result: dict, test_cases: list) -> int:
 # ═══════════════════════════════════════════════════════════════
 
 def judge_async(submission_id: int) -> None:
-    """Fire-and-forget: spawn a daemon thread to judge this submission."""
-    threading.Thread(
-        target=_run_judge,
-        args=(submission_id,),
-        daemon=True,
-        name=f"judge-{submission_id}",
-    ).start()
+    """Enqueue a background judge task via the shared thread pool.
+
+    The pool size is controlled by the JUDGE_MAX_WORKERS env var (default 4).
+    Submissions beyond the pool capacity queue up as futures.
+    """
+    future = _JUDGE_POOL.submit(_run_judge, submission_id)
+    pending = getattr(_JUDGE_POOL, '_work_queue', None)
+    queue_len = pending.qsize() if pending else 0
+    logger.info(
+        "Judge task enqueued: submission_id=%d, pending_queue=%d",
+        submission_id, queue_len,
+    )
+    # Attach a done callback for error surfacing
+    future.add_done_callback(lambda f: (
+        logger.error("Judge task failed: submission_id=%d, exception=%s",
+                      submission_id, f.exception())
+    ) if f.exception() else None)
 
 
 # ── Monkey-patch ─────────────────────────────────────────────

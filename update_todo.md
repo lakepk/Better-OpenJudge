@@ -24,7 +24,7 @@
   - **如何优化**：引入 `Flask-Limiter`，对 `/login` 路由限制为每 IP 每分钟 5 次失败后锁定 15 分钟。或手动在 `database.py` 中记录失败次数和时间戳。
   - **主要责任人**：data
 
-- [ ] **评测并发控制**
+- [x] **评测并发控制**
 
   - **现状**：[web/bridge.py](web/bridge.py) 第 204 行每次提交直接 `threading.Thread(...).start()`，无上限。想象 50 个用户同时提交 → 50 个 g++ 编译 + 50 个程序同时跑 → CPU/内存瞬间打满，服务器 OOM。
   - **如何优化**：引入 `concurrent.futures.ThreadPoolExecutor` 或 `queue.Queue` + worker 线程池，限制同时评测数（如 2-4 个）。超出排队等待。
@@ -138,7 +138,7 @@
   - **如何优化**：启用 WAL 模式（`PRAGMA journal_mode=WAL;`），读写互不阻塞。设置 `PRAGMA busy_timeout=5000;` 让写入等锁而非立即报错。若未来用户量增大，考虑迁移到 PostgreSQL。
   - **主要责任人**：data（database.py `get_db()` 中加 PRAGMA）
 
-- [ ] **日志系统**
+- [x] **日志系统**
 
   - **现状**：全应用零 `logging` 调用。唯一输出是 `print()`（init_db 里）、gunicorn access log 和异常 traceback。问题排查只能靠复现。
   - **如何优化**：配置 Python `logging` 模块（JSON 格式输出到 stdout，Docker 自动收集）。在 bridge、app、database 关键路径加 `logger.info()` / `logger.error()`。记录：每次评测的开始/结束/耗时、数据库错误、用户登录失败。
@@ -150,7 +150,7 @@
   - **如何优化**：新增 `@app.route('/health')` 返回 200 + `{"status": "ok"}`。可扩展为检查数据库连接是否正常。
   - **主要责任人**：data
 
-- [ ] **依赖版本锁定**
+- [x] **依赖版本锁定**
 
   - **现状**：[requirements.txt](requirements.txt) 中 `gunicorn` 和 `werkzeug` 无版本号，`flask>=3.0` 范围太宽。`pip install` 可能拉到不兼容的新版本，构建不可重复。
   - **如何优化**：运行 `pip freeze > requirements.lock` 锁定所有包的确切版本。`requirements.txt` 保留宽松约束，`requirements.lock` 用于生产构建。Dockerfile 中用 `requirements.lock` 安装。
@@ -168,7 +168,7 @@
   - **如何优化**：确认无引用后删除 `judge/judge/` 整个目录。
   - **主要责任人**：judge
 
-- [ ] **Windows 开发兼容**
+- [x] **Windows 开发兼容**
 
   - **现状**：[web/bridge.py](web/bridge.py) 第 52 行 `import resource` 是 Unix-only 模块（用于 `getrusage` 测量内存）。Windows 上整个应用无法启动，影响本地开发调试。
   - **如何优化**：改为 `try: import resource` 并包裹平台判断 `if sys.platform != 'win32'`。Windows 上用 `psutil.Process().memory_info()` 替代，或 Windows 上跳过内存测量只返回 0。
