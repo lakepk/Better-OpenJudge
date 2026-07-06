@@ -5,3 +5,7 @@ flask-wtf
 markdown>=3.7
 Pygments>=2.18
 flask-migrate>=4.0
+# Desktop
+PySide6>=6.5
+requests>=2.31
+pyinstaller>=6.0

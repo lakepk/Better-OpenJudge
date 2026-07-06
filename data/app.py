@@ -993,9 +993,192 @@ def api_submission(submission_id):
         "time_used": sub['time_used'],
         "memory_used": sub['memory_used'],
         "language": sub['language'],
+        "code": sub.get('code', ''),
         "compiler_output": sub['compiler_output'],
         "created_at": sub['created_at'],
     })
+
+
+# ── Extended API endpoints for desktop client ─────────────────
+
+@api_bp.route('/auth/login', methods=['POST'])
+def api_login():
+    """POST /api/v1/auth/login  — JSON body: {username, password} → {token, user}"""
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "请求体需为 JSON"}), 400
+
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+
+    if not username or not password:
+        return jsonify({"error": "用户名和密码不能为空"}), 400
+
+    locked, lock_msg = is_account_locked(username)
+    if locked:
+        return jsonify({"error": lock_msg}), 403
+
+    success, result = verify_user(username, password)
+    if not success:
+        record_login_failure(username)
+        return jsonify({"error": result}), 401
+
+    reset_login_failures(username)
+    user = get_user_by_id(result['id'])
+    token = create_api_token(result['id'], 'desktop-auto')
+
+    return jsonify({
+        "token": token,
+        "user": {
+            "id": user['id'],
+            "username": user['username'],
+            "nickname": user.get('nickname', ''),
+            "email": user.get('email', ''),
+            "role": user['role'],
+            "created_at": user.get('created_at', ''),
+        }
+    })
+
+
+@api_bp.route('/auth/register', methods=['POST'])
+def api_register():
+    """POST /api/v1/auth/register  — JSON body: {username, password, email, nickname}"""
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "请求体需为 JSON"}), 400
+
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    email = data.get('email', '').strip()
+    nickname = data.get('nickname', '').strip()
+
+    if not username or not password:
+        return jsonify({"error": "用户名和密码不能为空"}), 400
+    if len(username) < 3:
+        return jsonify({"error": "用户名至少3个字符"}), 400
+    if len(username) > 20:
+        return jsonify({"error": "用户名最多20个字符"}), 400
+    if len(password) < 6:
+        return jsonify({"error": "密码至少6位"}), 400
+
+    success, message = create_user(username, password, email, nickname)
+    if not success:
+        return jsonify({"error": message}), 409
+
+    user = get_user_by_username(username)
+    token = create_api_token(user['id'], 'desktop-auto')
+
+    return jsonify({
+        "token": token,
+        "user": {
+            "id": user['id'],
+            "username": user['username'],
+            "nickname": user.get('nickname', ''),
+            "email": user.get('email', ''),
+            "role": user['role'],
+            "created_at": user.get('created_at', ''),
+        }
+    }), 201
+
+
+@api_bp.route('/me')
+@api_login_required
+def api_me():
+    """GET /api/v1/me  — return current user profile with stats"""
+    user = request.api_user
+    ac_set = get_user_ac_problem_ids(user['id'])
+    submissions, total = get_submissions_by_user(user['id'], page=1, per_page=5)
+
+    return jsonify({
+        "id": user['id'],
+        "username": user['username'],
+        "nickname": user.get('nickname', ''),
+        "email": user.get('email', ''),
+        "role": user['role'],
+        "created_at": user.get('created_at', ''),
+        "last_login": user.get('last_login', ''),
+        "stats": {
+            "solved_count": len(ac_set),
+            "submission_count": total,
+        },
+        "recent_submissions": submissions,
+    })
+
+
+@api_bp.route('/submissions')
+@api_login_required
+def api_submissions():
+    """GET /api/v1/submissions?page=1  — current user's submissions"""
+    page = request.args.get('page', 1, type=int)
+    submissions, total = get_submissions_by_user(request.api_user['id'], page=page)
+    total_pages = max(1, (total + 19) // 20)
+    return jsonify({
+        "page": page,
+        "total": total,
+        "total_pages": total_pages,
+        "submissions": submissions,
+    })
+
+
+@api_bp.route('/contests')
+def api_contests():
+    """GET /api/v1/contests?page=1"""
+    page = request.args.get('page', 1, type=int)
+    contests, total = get_all_contests(include_hidden=False, page=page)
+    total_pages = max(1, (total + 19) // 20)
+    return jsonify({
+        "page": page,
+        "total": total,
+        "total_pages": total_pages,
+        "contests": contests,
+    })
+
+
+@api_bp.route('/contest/<int:contest_id>')
+def api_contest(contest_id):
+    """GET /api/v1/contest/<id>  — contest detail with standings"""
+    contest = get_contest_by_id(contest_id)
+    if not contest or not contest['is_visible']:
+        return jsonify({"error": "比赛不存在"}), 404
+    standings = get_contest_standings(contest_id)
+    return jsonify({
+        "contest": contest,
+        "standings": standings,
+    })
+
+
+@api_bp.route('/contest/<int:contest_id>/register', methods=['POST'])
+@api_login_required
+def api_contest_register(contest_id):
+    """POST /api/v1/contest/<id>/register"""
+    success, msg = register_for_contest(contest_id, request.api_user['id'])
+    return jsonify({"success": success, "message": msg})
+
+
+@api_bp.route('/ranking')
+def api_ranking():
+    """GET /api/v1/ranking?page=1"""
+    page = request.args.get('page', 1, type=int)
+    ranking_data, total = get_ranking(page=page, per_page=50)
+    total_pages = max(1, (total + 49) // 50)
+    return jsonify({
+        "page": page,
+        "total": total,
+        "total_pages": total_pages,
+        "ranking": ranking_data,
+    })
+
+
+@api_bp.route('/tags')
+def api_tags():
+    """GET /api/v1/tags  — all tags for filter dropdown"""
+    return jsonify(get_all_tags())
+
+
+@api_bp.route('/announcements')
+def api_announcements():
+    """GET /api/v1/announcements"""
+    return jsonify(get_announcements())
 
 
 app.register_blueprint(api_bp)
