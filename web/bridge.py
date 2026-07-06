@@ -20,10 +20,6 @@ _DATA_DIR = os.path.join(_PROJECT_ROOT, 'data')
 if _DATA_DIR not in sys.path:
     sys.path.insert(0, _DATA_DIR)
 
-_JUDGE_DIR = os.path.join(_PROJECT_ROOT, 'judge')
-if _JUDGE_DIR not in sys.path:
-    sys.path.insert(0, _JUDGE_DIR)
-
 # ── Override database path (env var, for Docker) ────────────
 from data import database as db_module
 
@@ -64,34 +60,6 @@ from data.database import (
 # ── Judge imports ───────────────────────────────────────────
 from judge.config import JudgeStatus
 from judge.core.controller import JudgeController
-from judge.core.runner import Runner
-
-# ── Fix: runner.py hardcodes "memory":0 — monkey-patch real measurement ──
-# resource module is Unix-only; on Windows skip memory measurement.
-try:
-    import resource
-    _HAS_RESOURCE = True
-except ImportError:
-    _HAS_RESOURCE = False
-
-if _HAS_RESOURCE:
-    _original_run_single_case = Runner.run_single_case
-
-    def _patched_run_single_case(self, input_file, output_file, time_limit, memory_limit):
-        """Wrapper that adds actual memory measurement via getrusage()."""
-        before = resource.getrusage(resource.RUSAGE_CHILDREN)
-        result = _original_run_single_case(self, input_file, output_file,
-                                           time_limit, memory_limit)
-        after = resource.getrusage(resource.RUSAGE_CHILDREN)
-        # ru_maxrss is in KB on Linux; convert to MB (the unit the DB expects)
-        memory_kb = after.ru_maxrss - before.ru_maxrss
-        if memory_kb > 0:
-            result['memory'] = round(memory_kb / 1024, 2)
-        return result
-
-    Runner.run_single_case = _patched_run_single_case
-else:
-    logger.info("Running on Windows — memory measurement via getrusage disabled")
 
 # ── Status mapping: JudgeStatus strings → DB short codes ────
 _STATUS_MAP = {
@@ -194,11 +162,12 @@ def _run_judge(submission_id: int) -> None:
         db_status   = _STATUS_MAP.get(result['status'], 'SE')
         detail_json = json.dumps(result.get('test_cases', []),
                                  ensure_ascii=False)
+        total_score = _calc_score(result, test_cases)
 
         update_submission_result(
             submission_id,
             status=db_status,
-            score=_calc_score(result, test_cases),
+            score=total_score,
             time_used=int(result.get('time_used', 0)),
             memory_used=int(result.get('memory_used', 0)),
             compiler_output=result.get('message', ''),
@@ -211,7 +180,7 @@ def _run_judge(submission_id: int) -> None:
         elapsed = round(time.time() - t_start, 2)
         logger.info(
             "Judge done: submission_id=%d, status=%s, score=%d, elapsed=%.2fs",
-            submission_id, db_status, _calc_score(result, test_cases), elapsed,
+            submission_id, db_status, total_score, elapsed,
         )
 
     except Exception as exc:

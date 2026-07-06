@@ -198,6 +198,15 @@ def init_db():
     except sqlite3.OperationalError:
         pass
 
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_submissions_problem_id ON submissions(problem_id)")
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_submissions_user_id ON submissions(user_id)")
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions(status)")
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_submissions_created_at ON submissions(created_at DESC)")
+
     conn.commit()
     conn.close()
     print("Database Initialized Successfully.")
@@ -502,6 +511,7 @@ def delete_problem(problem_id):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM problem_tags WHERE problem_id = ?", (problem_id,))
+    cursor.execute("DELETE FROM contest_problems WHERE problem_id = ?", (problem_id,))
     cursor.execute("DELETE FROM test_cases WHERE problem_id = ?", (problem_id,))
     cursor.execute("DELETE FROM submissions WHERE problem_id = ?", (problem_id,))
     cursor.execute("DELETE FROM problems WHERE id = ?", (problem_id,))

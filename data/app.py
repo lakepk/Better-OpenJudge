@@ -5,10 +5,25 @@ from functools import wraps
 from database import *
 from flask_wtf.csrf import CSRFProtect
 import markdown
+import re
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-use-env-var-in-production')
 csrf = CSRFProtect(app)
+
+# ── XSS sanitizer ──────────────────────────────────────────────
+_SCRIPT_RE = re.compile(r'<\s*script[\s>]', re.IGNORECASE)
+_IFRAME_RE = re.compile(r'<\s*iframe[\s>]', re.IGNORECASE)
+_ON_EVENT_RE = re.compile(r'\s+on\w+\s*=\s*["\']?', re.IGNORECASE)
+_JS_URL_RE = re.compile(r'(?:href|src|action)\s*=\s*["\']?\s*javascript:', re.IGNORECASE)
+
+
+def _sanitize_html(html: str) -> str:
+    html = _SCRIPT_RE.sub('&lt;script', html)
+    html = _IFRAME_RE.sub('&lt;iframe', html)
+    html = _ON_EVENT_RE.sub(' data-xss-', html)
+    html = _JS_URL_RE.sub(' blocked-', html)
+    return html
 
 # 启动时初始化数据库
 init_db()
@@ -28,7 +43,7 @@ def render_markdown(text):
     """将 Markdown 文本安全渲染为 HTML，消除 XSS 风险"""
     if not text:
         return ''
-    return markdown.markdown(
+    html = markdown.markdown(
         text,
         extensions=[
             'fenced_code',
@@ -43,6 +58,7 @@ def render_markdown(text):
             }
         }
     )
+    return _sanitize_html(html)
 
 
 # ==================== 权限装饰器 ====================
@@ -446,6 +462,12 @@ def submit_code(problem_id):
                                    problem=problem,
                                    user=session,
                                    error='代码不能为空')
+
+        if len(code) > 1024 * 1024:
+            return render_template('submit.html',
+                                   problem=problem,
+                                   user=session,
+                                   error='代码过长（最大 1 MB）')
 
         # 创建提交记录
         submission_id = create_submission(session['user_id'],
@@ -949,6 +971,7 @@ def api_submission(submission_id):
 
 
 app.register_blueprint(api_bp)
+csrf.exempt(api_bp)
 
 
 # ==================== 启动应用 ====================

@@ -14,7 +14,6 @@ import sys
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _PROJECT_ROOT)          # "from web.bridge …"  "from app …"
 sys.path.insert(0, os.path.join(_PROJECT_ROOT, 'data'))
-sys.path.insert(0, os.path.join(_PROJECT_ROOT, 'judge'))
 
 # ── Install bridge BEFORE importing Flask app ───────────────
 # This patches database.create_submission so every submission
