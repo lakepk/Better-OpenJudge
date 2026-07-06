@@ -25,7 +25,7 @@
                 <td>{{ s.score }}</td>
                 <td>{{ s.language }}</td>
                 <td>{{ s.time_used }}ms / {{ s.memory_used }}KB</td>
-                <td class="text-muted">{{ s.created_at }}</td>
+                <td class="text-muted">{{ s.created_at | bjtime }}</td>
             </tr>
             {% endfor %}
         </tbody>

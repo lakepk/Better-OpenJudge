@@ -26,7 +26,7 @@
                 <td>{{ a.title }}</td>
                 <td style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ a.content }}</td>
                 <td>{{ '是' if a.is_pinned else '否' }}</td>
-                <td class="text-muted">{{ a.created_at }}</td>
+                <td class="text-muted">{{ a.created_at | bjtime }}</td>
                 <td>
                     <form method="post" action="/admin/delete_announcement/{{ a.id }}" style="display:inline;" onsubmit="confirmDelete(this); return false;">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

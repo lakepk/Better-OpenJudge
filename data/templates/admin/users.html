@@ -27,7 +27,7 @@
                 <td>{{ u.email or '-' }}</td>
                 <td>{{ '管理员' if u.role == 'admin' else '用户' }}</td>
                 <td>{{ '正常' if u.is_active else '禁用' }}</td>
-                <td class="text-muted">{{ u.created_at }}</td>
+                <td class="text-muted">{{ u.created_at | bjtime }}</td>
                 <td>
                     <form method="post" action="/admin/toggle_user/{{ u.id }}" style="display:inline;">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

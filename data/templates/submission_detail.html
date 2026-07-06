@@ -19,7 +19,7 @@
         <tr><td><strong>语言</strong></td><td>{{ submission.language }}</td></tr>
         <tr><td><strong>运行时间</strong></td><td><span id="time-display">{{ submission.time_used }}ms</span></td></tr>
         <tr><td><strong>运行内存</strong></td><td><span id="memory-display">{{ submission.memory_used }}KB ({{ (submission.memory_used / 1024) | round(2) }}MB)</span></td></tr>
-        <tr><td><strong>提交时间</strong></td><td>{{ submission.created_at }}</td></tr>
+        <tr><td><strong>提交时间</strong></td><td>{{ submission.created_at | bjtime }}</td></tr>
     </table>
 </div>
 

@@ -6,10 +6,43 @@ from database import *
 from flask_wtf.csrf import CSRFProtect
 import markdown
 import re
+import datetime
+from zoneinfo import ZoneInfo
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-use-env-var-in-production')
 csrf = CSRFProtect(app)
+
+# ── Beijing time ───────────────────────────────────────────────
+BEIJING_TZ = ZoneInfo('Asia/Shanghai')
+
+
+def beijing_now():
+    """Return current Beijing time as ISO 8601 string."""
+    return datetime.datetime.now(BEIJING_TZ).isoformat()
+
+
+@app.template_filter('bjtime')
+def bjtime(iso_str):
+    """Convert a UTC ISO timestamp string to Beijing-time display.
+
+    Handles both 'YYYY-MM-DD HH:MM:SS' (SQLite CURRENT_TIMESTAMP)
+    and 'YYYY-MM-DDTHH:MM' (HTML datetime-local).
+    """
+    if not iso_str:
+        return ''
+    try:
+        # Normalise: replace space with T for fromisoformat compatibility
+        s = str(iso_str).replace(' ', 'T')
+        if len(s) == 16:   # YYYY-MM-DDTHH:MM  — form input, already Beijing
+            return s.replace('T', ' ')
+        dt = datetime.datetime.fromisoformat(s)
+        # If no tzinfo, assume UTC (SQLite CURRENT_TIMESTAMP)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=datetime.timezone.utc)
+        return dt.astimezone(BEIJING_TZ).strftime('%Y-%m-%d %H:%M')
+    except Exception:
+        return iso_str  # fallback: return as-is
 
 # ── XSS sanitizer ──────────────────────────────────────────────
 _SCRIPT_RE = re.compile(r'<\s*script[\s>]', re.IGNORECASE)
@@ -121,8 +154,6 @@ def health_check():
 # ==================== 用户系统 ====================
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    # 临时关闭公开注册
-    return redirect(url_for('login', error='注册功能暂时关闭'))
     if 'user_id' in session:
         return redirect(url_for('index'))
 
@@ -133,7 +164,6 @@ def register():
         email = request.form.get('email', '').strip()
         nickname = request.form.get('nickname', '').strip()
 
-        # 表单验证
         if not username or not password:
             return render_template('register.html', error='用户名和密码不能为空')
         if len(username) < 3:
@@ -215,8 +245,7 @@ def contest_list():
     contests, total = get_all_contests(include_hidden=is_admin, page=page)
     total_pages = max(1, (total + 19) // 20)
 
-    import datetime
-    now = datetime.datetime.now().isoformat()
+    now = beijing_now()
 
     return render_template('contests.html',
                            user=session,
@@ -241,8 +270,7 @@ def contest_detail(contest_id):
     if session.get('user_id'):
         is_registered = is_registered_for_contest(contest_id, session['user_id'])
 
-    import datetime
-    now = datetime.datetime.now().isoformat()
+    now = beijing_now()
 
     return render_template('contest_detail.html',
                            user=session,

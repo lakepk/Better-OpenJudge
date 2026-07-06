@@ -197,6 +197,14 @@ def init_db():
         cursor.execute("ALTER TABLE submissions ADD COLUMN queue_position INTEGER")
     except sqlite3.OperationalError:
         pass
+    try:
+        cursor.execute("ALTER TABLE contest_problems ADD COLUMN problem_order INTEGER DEFAULT 1")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        cursor.execute("ALTER TABLE contest_problems ADD COLUMN score INTEGER DEFAULT 100")
+    except sqlite3.OperationalError:
+        pass
 
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_submissions_problem_id ON submissions(problem_id)")
@@ -1049,23 +1057,63 @@ def get_contest_standings(contest_id):
     conn = get_db()
     cursor = conn.cursor()
 
+    # 比赛时间从表单输入是北京时间，需要转成 UTC 才能和 s.created_at 比较
+    cursor.execute("SELECT start_time, end_time FROM contests WHERE id = ?", (contest_id,))
+    ct = cursor.fetchone()
+    if not ct:
+        conn.close()
+        return []
+
+    def _to_utc(bj_str: str) -> str:
+        """'2026-07-06T18:00' → '2026-07-06 10:00' (SQLite UTC format)."""
+        import datetime
+        try:
+            s = bj_str.replace(' ', 'T')
+            if len(s) == 16:
+                s += ':00'
+            dt = datetime.datetime.fromisoformat(s)
+            # 假设输入是北京时间，转为 UTC
+            # fromisoformat 对 naive datetime 不做时区转换，直接减 8h
+            dt_utc = dt - datetime.timedelta(hours=8)
+            return dt_utc.strftime('%Y-%m-%d %H:%M:%S')
+        except Exception:
+            return bj_str
+
+    utc_start = _to_utc(ct['start_time'])
+    utc_end   = _to_utc(ct['end_time'])
+
     cursor.execute("""
         SELECT
             u.id, u.username, u.nickname,
             COUNT(DISTINCT s.id) as total_submissions,
-            SUM(CASE WHEN s.status = 'AC' THEN cp.score ELSE 0 END) as total_score,
-            SUM(CASE WHEN s.status = 'AC' THEN 1 ELSE 0 END) as ac_count,
+            (SELECT COALESCE(SUM(cp2.score), 0)
+             FROM contest_problems cp2
+             WHERE cp2.contest_id = cr.contest_id
+               AND EXISTS (
+                   SELECT 1 FROM submissions s2
+                   WHERE s2.user_id = u.id AND s2.problem_id = cp2.problem_id
+                     AND s2.status = 'AC'
+                     AND s2.created_at >= ?
+                     AND s2.created_at <= ?)) as total_score,
+            (SELECT COUNT(DISTINCT s3.problem_id)
+             FROM submissions s3
+             WHERE s3.user_id = u.id AND s3.status = 'AC'
+               AND s3.created_at >= ?
+               AND s3.created_at <= ?
+               AND s3.problem_id IN (
+                   SELECT cp3.problem_id FROM contest_problems cp3
+                   WHERE cp3.contest_id = cr.contest_id)) as ac_count,
             MAX(s.created_at) as last_submit_time
         FROM contest_registrations cr
         JOIN users u ON cr.user_id = u.id
         JOIN contest_problems cp ON cr.contest_id = cp.contest_id
         LEFT JOIN submissions s ON s.user_id = u.id AND s.problem_id = cp.problem_id
-            AND s.created_at >= (SELECT start_time FROM contests WHERE id = ?)
-            AND s.created_at <= (SELECT end_time FROM contests WHERE id = ?)
+            AND s.created_at >= ?
+            AND s.created_at <= ?
         WHERE cr.contest_id = ?
         GROUP BY u.id
         ORDER BY total_score DESC, ac_count DESC, total_submissions ASC
-    """, (contest_id, contest_id, contest_id))
+    """, (utc_start, utc_end, utc_start, utc_end, utc_start, utc_end, contest_id))
     standings = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return standings

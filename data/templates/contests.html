@@ -25,8 +25,8 @@
                         <span class="text-muted">[隐藏]</span>
                     {% endif %}
                 </td>
-                <td class="text-muted">{{ c.start_time[:16] | replace('T', ' ') }}</td>
-                <td class="text-muted">{{ c.end_time[:16] | replace('T', ' ') }}</td>
+                <td class="text-muted">{{ c.start_time | bjtime }}</td>
+                <td class="text-muted">{{ c.end_time | bjtime }}</td>
                 <td>
                     {% if now < c.start_time %}
                         <span class="status status-Pending">未开始</span>

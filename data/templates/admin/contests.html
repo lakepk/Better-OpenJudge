@@ -24,8 +24,8 @@
             <tr>
                 <td>{{ c.id }}</td>
                 <td><a href="/contest/{{ c.id }}">{{ c.title }}</a></td>
-                <td class="text-muted">{{ c.start_time[:16] | replace('T', ' ') }}</td>
-                <td class="text-muted">{{ c.end_time[:16] | replace('T', ' ') }}</td>
+                <td class="text-muted">{{ c.start_time | bjtime }}</td>
+                <td class="text-muted">{{ c.end_time | bjtime }}</td>
                 <td>{{ '是' if c.is_visible else '否' }}</td>
                 <td>
                     <a href="/admin/edit_contest/{{ c.id }}" class="btn btn-secondary btn-sm">编辑</a>

@@ -12,9 +12,9 @@
         <tr><td><strong>昵称</strong></td><td>{{ profile_user.nickname or '-' }}</td></tr>
         <tr><td><strong>邮箱</strong></td><td>{{ profile_user.email or '-' }}</td></tr>
         <tr><td><strong>角色</strong></td><td>{{ '管理员' if profile_user.role == 'admin' else '普通用户' }}</td></tr>
-        <tr><td><strong>注册时间</strong></td><td>{{ profile_user.created_at }}</td></tr>
+        <tr><td><strong>注册时间</strong></td><td>{{ profile_user.created_at | bjtime }}</td></tr>
         {% if profile_user.last_login %}
-        <tr><td><strong>最后登录</strong></td><td>{{ profile_user.last_login }}</td></tr>
+        <tr><td><strong>最后登录</strong></td><td>{{ profile_user.last_login | bjtime }}</td></tr>
         {% endif %}
     </table>
 </div>
@@ -37,7 +37,7 @@
                 <td><a href="/problem/{{ s.problem_id }}">{{ s.problem_title }}</a></td>
                 <td><span class="status status-{{ s.status }}">{{ s.status }}</span></td>
                 <td>{{ s.language }}</td>
-                <td class="text-muted">{{ s.created_at }}</td>
+                <td class="text-muted">{{ s.created_at | bjtime }}</td>
             </tr>
             {% endfor %}
         </tbody>

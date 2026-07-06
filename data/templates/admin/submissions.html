@@ -27,7 +27,7 @@
                 <td><span class="status status-{{ s.status }}">{{ s.status }}</span></td>
                 <td>{{ s.language }}</td>
                 <td>{{ s.time_used }}ms</td>
-                <td class="text-muted">{{ s.created_at }}</td>
+                <td class="text-muted">{{ s.created_at | bjtime }}</td>
                 <td>
                     <form method="post" action="/admin/rejudge_submission/{{ s.id }}" style="display:inline;" onsubmit="confirm('确定要重判该提交吗？')||event.preventDefault()">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

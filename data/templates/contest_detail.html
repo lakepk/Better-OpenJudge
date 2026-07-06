@@ -9,7 +9,7 @@
     {% endif %}
 
     <p class="text-muted mb-20">
-        ⏰ {{ contest.start_time[:16] | replace('T', ' ') }} ~ {{ contest.end_time[:16] | replace('T', ' ') }}
+        ⏰ {{ contest.start_time | bjtime }} ~ {{ contest.end_time | bjtime }}
         &nbsp;|&nbsp; 👥 {{ contest.registrations_count }} 人参赛
         {% if now < contest.start_time %}
             &nbsp;|&nbsp; <span class="status status-Pending">未开始</span>
